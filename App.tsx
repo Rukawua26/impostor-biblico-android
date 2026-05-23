@@ -14,6 +14,12 @@ import { defaultPlayers } from './src/data/defaultPlayers';
 import { createRound, normalizePlayers } from './src/game/createRound';
 import type { GameResult, GameSettings, Phase, Player, Round } from './src/types/game';
 
+type VoteTally = {
+  playerId: number;
+  name: string;
+  votes: number;
+};
+
 const defaultSettings: GameSettings = {
   discussionSeconds: 90,
   voteSeconds: 30,
@@ -36,12 +42,36 @@ export default function App() {
   const [eliminatedIds, setEliminatedIds] = useState<number[]>([]);
   const [gameResult, setGameResult] = useState<GameResult>(null);
   const [eliminatedPlayerName, setEliminatedPlayerName] = useState('');
+  const [voterIndex, setVoterIndex] = useState(0);
+  const [votes, setVotes] = useState<Record<number, number>>({});
+  const [eligibleVoteIds, setEligibleVoteIds] = useState<number[] | null>(null);
+  const [voteMessage, setVoteMessage] = useState('');
+  const [voteTally, setVoteTally] = useState<VoteTally[]>([]);
 
   const impostorPlayer = activePlayers.find((player) => player.id === round?.impostorId);
   const currentPlayer = activePlayers[revealIndex];
+  const currentVoter = activePlayers[voterIndex];
   const selectedPlayer = activePlayers.find((player) => player.id === selectedVoteId);
   const normalizedAll = useMemo(() => normalizePlayers(allPlayers), [allPlayers]);
   const canStart = normalizedAll.length >= 3;
+  const visibleEliminatedIds = useMemo(() => {
+    if (selectedVoteId && selectedVoteId !== round?.impostorId) {
+      return [...new Set([...eliminatedIds, selectedVoteId])];
+    }
+
+    return eliminatedIds;
+  }, [eliminatedIds, round?.impostorId, selectedVoteId]);
+  const visibleEliminatedPlayers = allPlayers.filter((player) =>
+    visibleEliminatedIds.includes(player.id),
+  );
+  const visibleActivePlayers = activePlayers.filter(
+    (player) => !visibleEliminatedIds.includes(player.id),
+  );
+  const voteCandidates = activePlayers.filter((player) => {
+    if (!eligibleVoteIds) return true;
+
+    return eligibleVoteIds.includes(player.id);
+  });
 
   useEffect(() => {
     if (phase !== 'discussion' || discussionTimeLeft <= 0) return;
@@ -114,6 +144,11 @@ export default function App() {
     setEliminatedIds([]);
     setGameResult(null);
     setEliminatedPlayerName('');
+    setVoterIndex(0);
+    setVotes({});
+    setEligibleVoteIds(null);
+    setVoteMessage('');
+    setVoteTally([]);
     setPhase('rules');
   }
 
@@ -141,17 +176,66 @@ export default function App() {
   function goToVote() {
     setVoteTimeLeft(settings.voteSeconds);
     setSelectedVoteId(null);
+    setVoterIndex(0);
+    setVotes({});
+    setEligibleVoteIds(null);
+    setVoteMessage('');
+    setVoteTally([]);
     setPhase('vote');
   }
 
-  function handleVoteResult() {
-    if (selectedVoteId === round?.impostorId) {
+  function finishVoting(finalVotes: Record<number, number>) {
+    const tally = voteCandidates
+      .map((player) => ({
+        playerId: player.id,
+        name: player.name,
+        votes: Object.values(finalVotes).filter((voteId) => voteId === player.id).length,
+      }))
+      .sort((a, b) => b.votes - a.votes || a.name.localeCompare(b.name));
+    const maxVotes = tally[0]?.votes ?? 0;
+    const tiedPlayers = tally.filter((item) => item.votes === maxVotes);
+
+    setVoteTally(tally);
+
+    if (tiedPlayers.length > 1) {
+      setVotes({});
+      setVoterIndex(0);
+      setSelectedVoteId(null);
+      setEligibleVoteIds(tiedPlayers.map((player) => player.playerId));
+      setVoteTimeLeft(settings.voteSeconds);
+      setVoteMessage(`Empate entre ${tiedPlayers.map((player) => player.name).join(', ')}. Voten de nuevo solo entre ellos.`);
+      return;
+    }
+
+    handleVoteResult(tiedPlayers[0].playerId);
+  }
+
+  function submitVote() {
+    if (!currentVoter || !selectedVoteId) return;
+
+    const nextVotes = { ...votes, [currentVoter.id]: selectedVoteId };
+
+    if (voterIndex < activePlayers.length - 1) {
+      setVotes(nextVotes);
+      setVoterIndex((current) => current + 1);
+      setSelectedVoteId(null);
+      return;
+    }
+
+    setVotes(nextVotes);
+    finishVoting(nextVotes);
+  }
+
+  function handleVoteResult(eliminatedId: number) {
+    setSelectedVoteId(eliminatedId);
+
+    if (eliminatedId === round?.impostorId) {
       setGameResult('innocents');
       setPhase('result');
       return;
     }
 
-    const eliminated = activePlayers.find((player) => player.id === selectedVoteId);
+    const eliminated = activePlayers.find((player) => player.id === eliminatedId);
     setEliminatedPlayerName(eliminated?.name ?? '');
 
     if (roundNumber >= settings.maxRounds) {
@@ -181,6 +265,10 @@ export default function App() {
     setDiscussionTimeLeft(settings.discussionSeconds);
     setCardVisible(false);
     setSelectedVoteId(null);
+    setVoterIndex(0);
+    setVotes({});
+    setEligibleVoteIds(null);
+    setVoteMessage('');
     setPhase('discussion');
   }
 
@@ -195,6 +283,11 @@ export default function App() {
     setEliminatedIds([]);
     setGameResult(null);
     setEliminatedPlayerName('');
+    setVoterIndex(0);
+    setVotes({});
+    setEligibleVoteIds(null);
+    setVoteMessage('');
+    setVoteTally([]);
   }
 
   function formatTime(seconds: number) {
@@ -327,14 +420,21 @@ export default function App() {
               3. Cada jugador da pistas sin decir la frase exacta.
             </Text>
             <Text style={styles.ruleText}>
-              4. Si votan al impostor, el grupo gana.
+              4. En cada votacion, cada jugador vota en secreto desde el mismo
+              telefono.
             </Text>
             <Text style={styles.ruleText}>
-              5. Si votan a un inocente, ese jugador queda eliminado y la
+              5. Si el mas votado es el impostor, el grupo gana.
+            </Text>
+            <Text style={styles.ruleText}>
+              6. Si votan a un inocente, ese jugador queda eliminado y la
               siguiente ronda empieza sin volver a mostrar la palabra.
             </Text>
             <Text style={styles.ruleText}>
-              6. Si el impostor sobrevive {settings.maxRounds} rondas, gana la
+              7. Si hay empate, se repite la votacion solo entre empatados.
+            </Text>
+            <Text style={styles.ruleText}>
+              8. Si el impostor sobrevive {settings.maxRounds} rondas, gana la
               partida.
             </Text>
             <Pressable style={styles.primaryButton} onPress={beginReveal}>
@@ -410,6 +510,20 @@ export default function App() {
               Tiempo restante de discusion. Pueden avanzar antes si todos estan
               listos.
             </Text>
+            <View style={styles.listCard}>
+              <Text style={styles.listTitle}>Jugadores activos</Text>
+              <Text style={styles.listText}>
+                {visibleActivePlayers.map((player) => player.name).join(', ')}
+              </Text>
+            </View>
+            {visibleEliminatedPlayers.length > 0 && (
+              <View style={styles.listCardMuted}>
+                <Text style={styles.listTitle}>Eliminados</Text>
+                <Text style={styles.listText}>
+                  {visibleEliminatedPlayers.map((player) => player.name).join(', ')}
+                </Text>
+              </View>
+            )}
             <Pressable style={styles.primaryButton} onPress={goToVote}>
               <Text style={styles.primaryButtonText}>Ir a votacion</Text>
             </Pressable>
@@ -418,14 +532,23 @@ export default function App() {
 
         {phase === 'vote' && (
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Votar al impostor</Text>
+            <Text style={styles.sectionTitle}>Vota {currentVoter?.name}</Text>
             <Text style={styles.timerText}>{formatTime(voteTimeLeft)}</Text>
             <Text style={styles.helperText}>
-              Elijan por consenso a quien eliminar.
+              Voto {Math.min(voterIndex + 1, activePlayers.length)} de {activePlayers.length}. Pasa el telefono al jugador indicado.
             </Text>
-            {activePlayers.map((player) => {
-              const isEliminated = eliminatedIds.includes(player.id);
-              if (isEliminated) return null;
+            {voteMessage ? <Text style={styles.warningText}>{voteMessage}</Text> : null}
+            {voteTally.length > 0 && (
+              <View style={styles.listCard}>
+                <Text style={styles.listTitle}>Conteo anterior</Text>
+                {voteTally.map((item) => (
+                  <Text key={item.playerId} style={styles.listText}>
+                    {item.name}: {item.votes} voto{item.votes === 1 ? '' : 's'}
+                  </Text>
+                ))}
+              </View>
+            )}
+            {voteCandidates.map((player) => {
               return (
                 <Pressable
                   key={player.id}
@@ -442,9 +565,9 @@ export default function App() {
             <Pressable
               style={[styles.primaryButton, !selectedVoteId && styles.disabledButton]}
               disabled={!selectedVoteId}
-              onPress={handleVoteResult}
+              onPress={submitVote}
             >
-              <Text style={styles.primaryButtonText}>Eliminar jugador</Text>
+              <Text style={styles.primaryButtonText}>Registrar voto</Text>
             </Pressable>
           </View>
         )}
@@ -463,6 +586,28 @@ export default function App() {
             <Text style={styles.helperText}>
               La palabra no se vuelve a mostrar. Los jugadores deben recordarla.
             </Text>
+            {voteTally.length > 0 && (
+              <View style={styles.listCard}>
+                <Text style={styles.listTitle}>Resultado de la votacion</Text>
+                {voteTally.map((item) => (
+                  <Text key={item.playerId} style={styles.listText}>
+                    {item.name}: {item.votes} voto{item.votes === 1 ? '' : 's'}
+                  </Text>
+                ))}
+              </View>
+            )}
+            <View style={styles.listCard}>
+              <Text style={styles.listTitle}>Siguen jugando</Text>
+              <Text style={styles.listText}>
+                {visibleActivePlayers.map((player) => player.name).join(', ')}
+              </Text>
+            </View>
+            <View style={styles.listCardMuted}>
+              <Text style={styles.listTitle}>Eliminados</Text>
+              <Text style={styles.listText}>
+                {visibleEliminatedPlayers.map((player) => player.name).join(', ')}
+              </Text>
+            </View>
             <Pressable style={styles.primaryButton} onPress={nextRound}>
               <Text style={styles.primaryButtonText}>
                 Siguiente ronda
@@ -486,6 +631,24 @@ export default function App() {
                 Ultimo eliminado: {selectedPlayer?.name}
               </Text>
             ) : null}
+            {voteTally.length > 0 && (
+              <View style={styles.listCard}>
+                <Text style={styles.listTitle}>Resultado de la votacion</Text>
+                {voteTally.map((item) => (
+                  <Text key={item.playerId} style={styles.listText}>
+                    {item.name}: {item.votes} voto{item.votes === 1 ? '' : 's'}
+                  </Text>
+                ))}
+              </View>
+            )}
+            {visibleEliminatedPlayers.length > 0 && (
+              <View style={styles.listCardMuted}>
+                <Text style={styles.listTitle}>Eliminados</Text>
+                <Text style={styles.listText}>
+                  {visibleEliminatedPlayers.map((player) => player.name).join(', ')}
+                </Text>
+              </View>
+            )}
             <Text style={styles.bodyText}>
               Historia: {round?.word}
             </Text>
@@ -708,6 +871,36 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 25,
     marginBottom: 10,
+  },
+  listCard: {
+    backgroundColor: '#0F1D2E',
+    borderColor: '#2C3E50',
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 12,
+    padding: 14,
+  },
+  listCardMuted: {
+    backgroundColor: '#172230',
+    borderColor: '#2C3E50',
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 12,
+    padding: 14,
+  },
+  listTitle: {
+    color: '#64B5F6',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  listText: {
+    color: '#CFD8DC',
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
   },
   voteButton: {
     backgroundColor: '#0F1D2E',
