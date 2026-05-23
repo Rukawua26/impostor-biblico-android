@@ -165,16 +165,23 @@ export default function App() {
 
   function nextRound() {
     const remaining = activePlayers.filter((player) => player.id !== selectedVoteId);
+
+    if (remaining.length <= 2) {
+      setGameResult('impostor');
+      setPhase('result');
+      return;
+    }
+
     setEliminatedIds((current) => [
       ...current,
       ...(selectedVoteId ? [selectedVoteId] : []),
     ]);
     setActivePlayers(remaining);
     setRoundNumber((current) => current + 1);
-    setRevealIndex(0);
+    setDiscussionTimeLeft(settings.discussionSeconds);
     setCardVisible(false);
     setSelectedVoteId(null);
-    setPhase('reveal');
+    setPhase('discussion');
   }
 
   function resetGame() {
@@ -313,7 +320,8 @@ export default function App() {
               1. Un jugador sera el impostor y no vera la historia biblica.
             </Text>
             <Text style={styles.ruleText}>
-              2. Los demas jugadores ven la misma historia.
+              2. Los demas jugadores ven la misma historia solo una vez y deben
+              memorizarla.
             </Text>
             <Text style={styles.ruleText}>
               3. Cada jugador da pistas sin decir la frase exacta.
@@ -322,8 +330,8 @@ export default function App() {
               4. Si votan al impostor, el grupo gana.
             </Text>
             <Text style={styles.ruleText}>
-              5. Si votan a un inocente, ese jugador queda eliminado y el juego
-              continua.
+              5. Si votan a un inocente, ese jugador queda eliminado y la
+              siguiente ronda empieza sin volver a mostrar la palabra.
             </Text>
             <Text style={styles.ruleText}>
               6. Si el impostor sobrevive {settings.maxRounds} rondas, gana la
@@ -451,6 +459,9 @@ export default function App() {
             </Text>
             <Text style={styles.bodyText}>
               Quedan {activePlayers.length - 1} jugadores en la partida.
+            </Text>
+            <Text style={styles.helperText}>
+              La palabra no se vuelve a mostrar. Los jugadores deben recordarla.
             </Text>
             <Pressable style={styles.primaryButton} onPress={nextRound}>
               <Text style={styles.primaryButtonText}>
