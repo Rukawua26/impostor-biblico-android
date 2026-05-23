@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "El Impostor Bíblico",
+    "slug": "impostor-biblico-android",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.miguel.impostorbiblico",
+      "permissions": [],
+      "adaptiveIcon": {
+        "backgroundColor": "#1B1208",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
