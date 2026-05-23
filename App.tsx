@@ -1,6 +1,8 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,30 +12,36 @@ import {
 } from 'react-native';
 import { defaultPlayers } from './src/data/defaultPlayers';
 import { createRound, normalizePlayers } from './src/game/createRound';
-import type { GameSettings, Phase, Player, Round } from './src/types/game';
+import type { GameResult, GameSettings, Phase, Player, Round } from './src/types/game';
 
 const defaultSettings: GameSettings = {
   discussionSeconds: 90,
   voteSeconds: 30,
+  maxRounds: 5,
 };
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>('setup');
-  const [players, setPlayers] = useState<Player[]>(defaultPlayers);
+  const [allPlayers, setAllPlayers] = useState<Player[]>(defaultPlayers);
+  const [activePlayers, setActivePlayers] = useState<Player[]>([]);
   const [settings, setSettings] = useState<GameSettings>(defaultSettings);
   const [round, setRound] = useState<Round | null>(null);
   const [revealIndex, setRevealIndex] = useState(0);
   const [cardVisible, setCardVisible] = useState(false);
   const [selectedVoteId, setSelectedVoteId] = useState<number | null>(null);
-  const [discussionTimeLeft, setDiscussionTimeLeft] = useState(defaultSettings.discussionSeconds);
-  const [voteTimeLeft, setVoteTimeLeft] = useState(defaultSettings.voteSeconds);
+  const [discussionTimeLeft, setDiscussionTimeLeft] = useState(0);
+  const [voteTimeLeft, setVoteTimeLeft] = useState(0);
   const [setupMessage, setSetupMessage] = useState('');
+  const [roundNumber, setRoundNumber] = useState(1);
+  const [eliminatedIds, setEliminatedIds] = useState<number[]>([]);
+  const [gameResult, setGameResult] = useState<GameResult>(null);
+  const [eliminatedPlayerName, setEliminatedPlayerName] = useState('');
 
-  const currentPlayer = players[revealIndex];
-  const selectedPlayer = players.find((player) => player.id === selectedVoteId);
-  const impostorPlayer = players.find((player) => player.id === round?.impostorId);
-  const normalizedPlayers = useMemo(() => normalizePlayers(players), [players]);
-  const canStart = normalizedPlayers.length >= 3;
+  const impostorPlayer = activePlayers.find((player) => player.id === round?.impostorId);
+  const currentPlayer = activePlayers[revealIndex];
+  const selectedPlayer = activePlayers.find((player) => player.id === selectedVoteId);
+  const normalizedAll = useMemo(() => normalizePlayers(allPlayers), [allPlayers]);
+  const canStart = normalizedAll.length >= 3;
 
   useEffect(() => {
     if (phase !== 'discussion' || discussionTimeLeft <= 0) return;
@@ -56,52 +64,56 @@ export default function App() {
   }, [phase, voteTimeLeft]);
 
   const subtitle = useMemo(() => {
-    if (phase === 'setup') return 'Configura jugadores y empieza la ronda.';
-    if (phase === 'rules') return 'Lee las reglas antes de pasar el telefono.';
+    if (phase === 'setup') return 'Configura jugadores y la partida.';
+    if (phase === 'rules') return 'Lee las reglas antes de empezar.';
     if (phase === 'reveal') return 'Pasa el telefono para ver roles en secreto.';
-    if (phase === 'discussion') return 'Hablen sin revelar la palabra directamente.';
-    if (phase === 'vote') return 'El grupo decide quien parece el impostor.';
-    return 'Resultado de la ronda.';
-  }, [phase]);
+    if (phase === 'discussion') return `Ronda ${roundNumber} de ${settings.maxRounds}`;
+    if (phase === 'vote') return 'El grupo decide quien es el impostor.';
+    if (phase === 'eliminated') return `${eliminatedPlayerName} fue eliminado.`;
+    if (gameResult === 'innocents') return 'El grupo gano la partida.';
+    if (gameResult === 'impostor') return 'El impostor gano la partida.';
+    return '';
+  }, [phase, roundNumber, settings.maxRounds, eliminatedPlayerName, gameResult]);
 
   function updatePlayerName(id: number, name: string) {
-    setPlayers((current) =>
+    setAllPlayers((current) =>
       current.map((player) => (player.id === id ? { ...player, name } : player)),
     );
     setSetupMessage('');
   }
 
   function addPlayer() {
-    setPlayers((current) => [
+    setAllPlayers((current) => [
       ...current,
       { id: Date.now(), name: `Jugador ${current.length + 1}` },
     ]);
   }
 
   function removePlayer(id: number) {
-    setPlayers((current) => current.filter((player) => player.id !== id));
+    setAllPlayers((current) => current.filter((player) => player.id !== id));
     setSetupMessage('');
   }
 
-  function updateSetting(key: keyof GameSettings, value: number) {
-    setSettings((current) => ({ ...current, [key]: value }));
-  }
+  function startGame() {
+    const players = normalizePlayers(allPlayers);
 
-  function startRound() {
-    const activePlayers = normalizePlayers(players);
-
-    if (activePlayers.length < 3) {
+    if (players.length < 3) {
       setSetupMessage('Necesitas al menos 3 jugadores con nombres distintos.');
       return;
     }
 
-    setPlayers(activePlayers);
-    setRound(createRound(activePlayers));
+    setAllPlayers(players);
+    setActivePlayers(players);
+    setRound(createRound(players));
     setRevealIndex(0);
     setCardVisible(false);
     setSelectedVoteId(null);
     setDiscussionTimeLeft(settings.discussionSeconds);
     setVoteTimeLeft(settings.voteSeconds);
+    setRoundNumber(1);
+    setEliminatedIds([]);
+    setGameResult(null);
+    setEliminatedPlayerName('');
     setPhase('rules');
   }
 
@@ -115,7 +127,7 @@ export default function App() {
       return;
     }
 
-    if (revealIndex === players.length - 1) {
+    if (revealIndex === activePlayers.length - 1) {
       setPhase('discussion');
       setCardVisible(false);
       setDiscussionTimeLeft(settings.discussionSeconds);
@@ -126,6 +138,45 @@ export default function App() {
     setCardVisible(false);
   }
 
+  function goToVote() {
+    setVoteTimeLeft(settings.voteSeconds);
+    setSelectedVoteId(null);
+    setPhase('vote');
+  }
+
+  function handleVoteResult() {
+    if (selectedVoteId === round?.impostorId) {
+      setGameResult('innocents');
+      setPhase('result');
+      return;
+    }
+
+    const eliminated = activePlayers.find((player) => player.id === selectedVoteId);
+    setEliminatedPlayerName(eliminated?.name ?? '');
+
+    if (roundNumber >= settings.maxRounds) {
+      setGameResult('impostor');
+      setPhase('result');
+      return;
+    }
+
+    setPhase('eliminated');
+  }
+
+  function nextRound() {
+    const remaining = activePlayers.filter((player) => player.id !== selectedVoteId);
+    setEliminatedIds((current) => [
+      ...current,
+      ...(selectedVoteId ? [selectedVoteId] : []),
+    ]);
+    setActivePlayers(remaining);
+    setRoundNumber((current) => current + 1);
+    setRevealIndex(0);
+    setCardVisible(false);
+    setSelectedVoteId(null);
+    setPhase('reveal');
+  }
+
   function resetGame() {
     setPhase('setup');
     setRevealIndex(0);
@@ -133,12 +184,10 @@ export default function App() {
     setSelectedVoteId(null);
     setRound(null);
     setSetupMessage('');
-  }
-
-  function goToVote() {
-    setVoteTimeLeft(settings.voteSeconds);
-    setSelectedVoteId(null);
-    setPhase('vote');
+    setRoundNumber(1);
+    setEliminatedIds([]);
+    setGameResult(null);
+    setEliminatedPlayerName('');
   }
 
   function formatTime(seconds: number) {
@@ -148,33 +197,41 @@ export default function App() {
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'android' ? undefined : 'padding'}
+    >
       <StatusBar style="light" />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.hero}>
-          <Text style={styles.kicker}>Juego presencial</Text>
+          <Text style={styles.kicker}>Juego presencial multijugador</Text>
           <Text style={styles.title}>El Impostor Biblico</Text>
-          <Text style={styles.subtitle}>{subtitle}</Text>
+          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
         </View>
 
         {phase === 'setup' && (
           <>
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>Jugadores</Text>
-              <Text style={styles.helperText}>Minimo 3 jugadores. Los nombres repetidos se ignoraran.</Text>
-              {players.map((player, index) => (
+              <Text style={styles.helperText}>
+                Minimo 3. Los nombres repetidos se ignoran.
+              </Text>
+              {allPlayers.map((player, index) => (
                 <View key={player.id} style={styles.playerRow}>
                   <TextInput
                     style={styles.input}
                     value={player.name}
                     placeholder={`Jugador ${index + 1}`}
-                    placeholderTextColor="#8F7A62"
+                    placeholderTextColor="#607D8B"
                     returnKeyType="done"
                     onChangeText={(name) => updatePlayerName(player.id, name)}
                   />
-                  {players.length > 3 && (
-                    <Pressable style={styles.smallButton} onPress={() => removePlayer(player.id)}>
-                      <Text style={styles.smallButtonText}>Quitar</Text>
+                  {allPlayers.length > 3 && (
+                    <Pressable
+                      style={styles.smallButton}
+                      onPress={() => removePlayer(player.id)}
+                    >
+                      <Text style={styles.smallButtonText}>X</Text>
                     </Pressable>
                   )}
                 </View>
@@ -182,52 +239,68 @@ export default function App() {
               <Pressable style={styles.secondaryButton} onPress={addPlayer}>
                 <Text style={styles.secondaryButtonText}>Agregar jugador</Text>
               </Pressable>
-              {setupMessage ? <Text style={styles.warningText}>{setupMessage}</Text> : null}
+              {setupMessage ? (
+                <Text style={styles.warningText}>{setupMessage}</Text>
+              ) : null}
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Tiempos</Text>
-              <Text style={styles.helperText}>Puedes ajustar los tiempos antes de iniciar.</Text>
-              <View style={styles.settingRow}>
-                <Text style={styles.settingLabel}>Discusion</Text>
-                <View style={styles.settingButtons}>
-                  {[60, 90, 120].map((seconds) => (
-                    <Pressable
-                      key={seconds}
-                      style={[
-                        styles.optionButton,
-                        settings.discussionSeconds === seconds && styles.optionButtonSelected,
-                      ]}
-                      onPress={() => updateSetting('discussionSeconds', seconds)}
-                    >
-                      <Text style={styles.optionButtonText}>{seconds}s</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-              <View style={styles.settingRow}>
-                <Text style={styles.settingLabel}>Votacion</Text>
-                <View style={styles.settingButtons}>
-                  {[20, 30, 45].map((seconds) => (
-                    <Pressable
-                      key={seconds}
-                      style={[
-                        styles.optionButton,
-                        settings.voteSeconds === seconds && styles.optionButtonSelected,
-                      ]}
-                      onPress={() => updateSetting('voteSeconds', seconds)}
-                    >
-                      <Text style={styles.optionButtonText}>{seconds}s</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
+              <Text style={styles.sectionTitle}>Configuracion</Text>
+
+              <Text style={styles.settingLabel}>Tiempo de discusion (segundos)</Text>
+              <TextInput
+                style={styles.input}
+                value={String(settings.discussionSeconds)}
+                onChangeText={(text) => {
+                  const num = parseInt(text, 10);
+                  if (!isNaN(num) && num > 0) {
+                    setSettings((prev) => ({ ...prev, discussionSeconds: num }));
+                  }
+                }}
+                keyboardType="number-pad"
+                returnKeyType="done"
+                placeholder="90"
+                placeholderTextColor="#607D8B"
+              />
+
+              <Text style={styles.settingLabel}>Tiempo de votacion (segundos)</Text>
+              <TextInput
+                style={styles.input}
+                value={String(settings.voteSeconds)}
+                onChangeText={(text) => {
+                  const num = parseInt(text, 10);
+                  if (!isNaN(num) && num > 0) {
+                    setSettings((prev) => ({ ...prev, voteSeconds: num }));
+                  }
+                }}
+                keyboardType="number-pad"
+                returnKeyType="done"
+                placeholder="30"
+                placeholderTextColor="#607D8B"
+              />
+
+              <Text style={styles.settingLabel}>Rondas maximas</Text>
+              <TextInput
+                style={styles.input}
+                value={String(settings.maxRounds)}
+                onChangeText={(text) => {
+                  const num = parseInt(text, 10);
+                  if (!isNaN(num) && num >= 1 && num <= 10) {
+                    setSettings((prev) => ({ ...prev, maxRounds: num }));
+                  }
+                }}
+                keyboardType="number-pad"
+                returnKeyType="done"
+                placeholder="5"
+                placeholderTextColor="#607D8B"
+              />
+
               <Pressable
                 style={[styles.primaryButton, !canStart && styles.disabledButton]}
                 disabled={!canStart}
-                onPress={startRound}
+                onPress={startGame}
               >
-                <Text style={styles.primaryButtonText}>Iniciar ronda</Text>
+                <Text style={styles.primaryButtonText}>Iniciar partida</Text>
               </Pressable>
             </View>
           </>
@@ -235,58 +308,100 @@ export default function App() {
 
         {phase === 'rules' && (
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Reglas rapidas</Text>
-            <Text style={styles.ruleText}>1. Un jugador sera impostor y no vera la historia.</Text>
-            <Text style={styles.ruleText}>2. Los demas veran la misma historia biblica.</Text>
-            <Text style={styles.ruleText}>3. Cada jugador da pistas sin decir la frase exacta.</Text>
-            <Text style={styles.ruleText}>4. Al final todos votan por quien parece impostor.</Text>
-            <Text style={styles.ruleText}>5. Si votan al impostor, gana el grupo; si no, gana el impostor.</Text>
+            <Text style={styles.sectionTitle}>Como se juega</Text>
+            <Text style={styles.ruleText}>
+              1. Un jugador sera el impostor y no vera la historia biblica.
+            </Text>
+            <Text style={styles.ruleText}>
+              2. Los demas jugadores ven la misma historia.
+            </Text>
+            <Text style={styles.ruleText}>
+              3. Cada jugador da pistas sin decir la frase exacta.
+            </Text>
+            <Text style={styles.ruleText}>
+              4. Si votan al impostor, el grupo gana.
+            </Text>
+            <Text style={styles.ruleText}>
+              5. Si votan a un inocente, ese jugador queda eliminado y el juego
+              continua.
+            </Text>
+            <Text style={styles.ruleText}>
+              6. Si el impostor sobrevive {settings.maxRounds} rondas, gana la
+              partida.
+            </Text>
             <Pressable style={styles.primaryButton} onPress={beginReveal}>
-              <Text style={styles.primaryButtonText}>Entendido, revelar roles</Text>
+              <Text style={styles.primaryButtonText}>Entendido</Text>
             </Pressable>
           </View>
         )}
 
         {phase === 'reveal' && currentPlayer && (
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Turno de {currentPlayer.name}</Text>
-            <Text style={styles.helperText}>Pasa el telefono. Solo esta persona debe mirar la siguiente pantalla.</Text>
+            <Text style={styles.sectionTitle}>
+              Turno de {currentPlayer.name}
+            </Text>
+            <Text style={styles.helperText}>
+              Solo esta persona debe mirar la pantalla.
+            </Text>
             <View style={styles.roleCard}>
               {cardVisible ? (
                 currentPlayer.id === round?.impostorId ? (
                   <>
-                    <Text style={styles.roleLabel}>Tu rol</Text>
+                    <Text style={styles.roleLabel}>Tu eres el IMPOSTOR</Text>
                     <Text style={styles.impostorText}>Impostor</Text>
-                    <Text style={styles.roleHint}>Descubre la historia escuchando a los demas.</Text>
+                    <Text style={styles.roleHint}>
+                      No sabes cual es la historia. Escucha a los demas y finge.
+                    </Text>
+                    <View style={styles.phraseCard}>
+                      <Text style={styles.phraseLabel}>
+                        Frase para comenzar:
+                      </Text>
+                      <Text style={styles.phraseText}>
+                        {round?.impostorPhrase}
+                      </Text>
+                    </View>
                   </>
                 ) : (
                   <>
                     <Text style={styles.roleLabel}>Historia biblica</Text>
                     <Text style={styles.wordText}>{round?.word}</Text>
-                    <Text style={styles.roleHint}>Da pistas sin decir la frase exacta.</Text>
+                    <Text style={styles.roleHint}>
+                      Da pistas sin decir la frase exacta.
+                    </Text>
                   </>
                 )
               ) : (
                 <>
                   <Text style={styles.roleLabel}>Pantalla oculta</Text>
-                  <Text style={styles.hiddenText}>Solo {currentPlayer.name} debe mirar.</Text>
+                  <Text style={styles.hiddenText}>
+                    Solo {currentPlayer.name} debe ver.
+                  </Text>
                 </>
               )}
             </View>
             <Pressable style={styles.primaryButton} onPress={continueReveal}>
-              <Text style={styles.primaryButtonText}>{cardVisible ? 'Ocultar y pasar' : 'Ver mi rol'}</Text>
+              <Text style={styles.primaryButtonText}>
+                {cardVisible ? 'Ocultar y pasar' : 'Ver mi rol'}
+              </Text>
             </Pressable>
           </View>
         )}
 
         {phase === 'discussion' && (
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Discusion</Text>
+            <View style={styles.roundBadge}>
+              <Text style={styles.roundBadgeText}>
+                Ronda {roundNumber} de {settings.maxRounds}
+              </Text>
+            </View>
             <Text style={styles.timerText}>{formatTime(discussionTimeLeft)}</Text>
             <Text style={styles.bodyText}>
-              Cada jugador da una pista breve. El impostor debe fingir que conoce la historia.
+              Cada jugador da una pista breve. El impostor debe fingir.
             </Text>
-            <Text style={styles.helperText}>Cuando el tiempo llegue a cero, pasen a votacion. Tambien puedes avanzar antes.</Text>
+            <Text style={styles.helperText}>
+              Tiempo restante de discusion. Pueden avanzar antes si todos estan
+              listos.
+            </Text>
             <Pressable style={styles.primaryButton} onPress={goToVote}>
               <Text style={styles.primaryButtonText}>Ir a votacion</Text>
             </Pressable>
@@ -295,24 +410,52 @@ export default function App() {
 
         {phase === 'vote' && (
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Votar impostor</Text>
+            <Text style={styles.sectionTitle}>Votar al impostor</Text>
             <Text style={styles.timerText}>{formatTime(voteTimeLeft)}</Text>
-            <Text style={styles.helperText}>Elige al jugador con mas votos del grupo.</Text>
-            {players.map((player) => (
-              <Pressable
-                key={player.id}
-                style={[styles.voteButton, selectedVoteId === player.id && styles.voteButtonSelected]}
-                onPress={() => setSelectedVoteId(player.id)}
-              >
-                <Text style={styles.voteButtonText}>{player.name}</Text>
-              </Pressable>
-            ))}
+            <Text style={styles.helperText}>
+              Elijan por consenso a quien eliminar.
+            </Text>
+            {activePlayers.map((player) => {
+              const isEliminated = eliminatedIds.includes(player.id);
+              if (isEliminated) return null;
+              return (
+                <Pressable
+                  key={player.id}
+                  style={[
+                    styles.voteButton,
+                    selectedVoteId === player.id && styles.voteButtonSelected,
+                  ]}
+                  onPress={() => setSelectedVoteId(player.id)}
+                >
+                  <Text style={styles.voteButtonText}>{player.name}</Text>
+                </Pressable>
+              );
+            })}
             <Pressable
               style={[styles.primaryButton, !selectedVoteId && styles.disabledButton]}
               disabled={!selectedVoteId}
-              onPress={() => setPhase('result')}
+              onPress={handleVoteResult}
             >
-              <Text style={styles.primaryButtonText}>Revelar resultado</Text>
+              <Text style={styles.primaryButtonText}>Eliminar jugador</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {phase === 'eliminated' && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>
+              {eliminatedPlayerName} fue eliminado
+            </Text>
+            <Text style={styles.bodyText}>
+              No era el impostor. El juego continua.
+            </Text>
+            <Text style={styles.bodyText}>
+              Quedan {activePlayers.length - 1} jugadores en la partida.
+            </Text>
+            <Pressable style={styles.primaryButton} onPress={nextRound}>
+              <Text style={styles.primaryButtonText}>
+                Siguiente ronda
+              </Text>
             </Pressable>
           </View>
         )}
@@ -320,28 +463,46 @@ export default function App() {
         {phase === 'result' && (
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>
-              {selectedVoteId === round?.impostorId ? 'El grupo acerto' : 'El impostor escapo'}
+              {gameResult === 'innocents'
+                ? 'El grupo gano la partida'
+                : 'El impostor gano la partida'}
             </Text>
-            <Text style={styles.bodyText}>Impostor: {impostorPlayer?.name}</Text>
-            <Text style={styles.bodyText}>Votaron por: {selectedPlayer?.name}</Text>
-            <Text style={styles.bodyText}>Historia: {round?.word}</Text>
-            <Pressable style={styles.primaryButton} onPress={startRound}>
-              <Text style={styles.primaryButtonText}>Nueva ronda</Text>
+            <Text style={styles.bodyText}>
+              Impostor: {impostorPlayer?.name}
+            </Text>
+            {selectedVoteId ? (
+              <Text style={styles.bodyText}>
+                Ultimo eliminado: {selectedPlayer?.name}
+              </Text>
+            ) : null}
+            <Text style={styles.bodyText}>
+              Historia: {round?.word}
+            </Text>
+            {gameResult === 'impostor' && (
+              <Text style={styles.bodyText}>
+                El impostor sobrevivio {settings.maxRounds} rondas sin ser
+                descubierto.
+              </Text>
+            )}
+            <Pressable style={styles.primaryButton} onPress={startGame}>
+              <Text style={styles.primaryButtonText}>Nueva partida</Text>
             </Pressable>
             <Pressable style={styles.secondaryButton} onPress={resetGame}>
-              <Text style={styles.secondaryButtonText}>Editar jugadores</Text>
+              <Text style={styles.secondaryButtonText}>
+                Volver a jugadores
+              </Text>
             </Pressable>
           </View>
         )}
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#120B06',
+    backgroundColor: '#0D1B2A',
   },
   content: {
     flexGrow: 1,
@@ -352,35 +513,35 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   kicker: {
-    color: '#E8B45D',
+    color: '#64B5F6',
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   title: {
-    color: '#FFF4E2',
+    color: '#FFFFFF',
     fontSize: 42,
     fontWeight: '900',
     lineHeight: 46,
     marginTop: 10,
   },
   subtitle: {
-    color: '#CBB89F',
+    color: '#90A4AE',
     fontSize: 17,
     lineHeight: 24,
     marginTop: 12,
   },
   card: {
-    backgroundColor: '#21150C',
-    borderColor: '#3D2918',
+    backgroundColor: '#1B2838',
+    borderColor: '#2C3E50',
     borderRadius: 28,
     borderWidth: 1,
     marginBottom: 16,
     padding: 20,
   },
   sectionTitle: {
-    color: '#FFF4E2',
+    color: '#FFFFFF',
     fontSize: 24,
     fontWeight: '800',
     marginBottom: 16,
@@ -391,50 +552,38 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   input: {
-    backgroundColor: '#150D08',
-    borderColor: '#49301B',
+    backgroundColor: '#0F1D2E',
+    borderColor: '#2C3E50',
     borderRadius: 16,
     borderWidth: 1,
-    color: '#FFF4E2',
+    color: '#FFFFFF',
     flex: 1,
     fontSize: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  helperText: {
-    color: '#B7A185',
-    fontSize: 15,
-    lineHeight: 21,
-    marginBottom: 16,
-  },
-  warningText: {
-    color: '#FFB199',
-    fontSize: 15,
-    fontWeight: '800',
-    marginTop: 12,
-  },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#E8B45D',
+    backgroundColor: '#1565C0',
     borderRadius: 18,
     marginTop: 16,
     paddingVertical: 15,
   },
   primaryButtonText: {
-    color: '#1B1208',
+    color: '#FFFFFF',
     fontSize: 17,
     fontWeight: '900',
   },
   secondaryButton: {
     alignItems: 'center',
-    borderColor: '#6C4D2D',
+    borderColor: '#1565C0',
     borderRadius: 18,
     borderWidth: 1,
     marginTop: 8,
     paddingVertical: 14,
   },
   secondaryButtonText: {
-    color: '#F2C981',
+    color: '#64B5F6',
     fontSize: 16,
     fontWeight: '800',
   },
@@ -443,26 +592,39 @@ const styles = StyleSheet.create({
   },
   smallButton: {
     alignItems: 'center',
-    borderColor: '#6C4D2D',
+    backgroundColor: '#EF5350',
     borderRadius: 14,
-    borderWidth: 1,
     justifyContent: 'center',
+    minWidth: 44,
     paddingHorizontal: 12,
   },
   smallButtonText: {
-    color: '#F2C981',
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 16,
+  },
+  helperText: {
+    color: '#90A4AE',
+    fontSize: 15,
+    lineHeight: 21,
+    marginBottom: 16,
+  },
+  warningText: {
+    color: '#EF9A9A',
+    fontSize: 15,
     fontWeight: '800',
+    marginTop: 12,
   },
   roleCard: {
     alignItems: 'center',
-    backgroundColor: '#150D08',
+    backgroundColor: '#0F1D2E',
     borderRadius: 24,
     justifyContent: 'center',
     minHeight: 220,
     padding: 20,
   },
   roleLabel: {
-    color: '#A79073',
+    color: '#90A4AE',
     fontSize: 14,
     fontWeight: '800',
     letterSpacing: 1,
@@ -470,95 +632,107 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   wordText: {
-    color: '#FFF4E2',
+    color: '#FFFFFF',
     fontSize: 34,
     fontWeight: '900',
     textAlign: 'center',
   },
   impostorText: {
-    color: '#FF705D',
+    color: '#EF5350',
     fontSize: 42,
     fontWeight: '900',
     textAlign: 'center',
   },
   hiddenText: {
-    color: '#FFF4E2',
+    color: '#FFFFFF',
     fontSize: 26,
     fontWeight: '800',
     textAlign: 'center',
   },
   roleHint: {
-    color: '#CBB89F',
+    color: '#B0BEC5',
     fontSize: 16,
     lineHeight: 23,
     marginTop: 16,
     textAlign: 'center',
   },
+  phraseCard: {
+    backgroundColor: '#1A3A5C',
+    borderRadius: 16,
+    marginTop: 20,
+    padding: 16,
+    width: '100%',
+  },
+  phraseLabel: {
+    color: '#64B5F6',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  phraseText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+    fontStyle: 'italic',
+    lineHeight: 26,
+    textAlign: 'center',
+  },
   ruleText: {
-    color: '#D9C7AD',
+    color: '#CFD8DC',
     fontSize: 16,
     lineHeight: 24,
     marginBottom: 10,
   },
   timerText: {
-    color: '#E8B45D',
+    color: '#64B5F6',
     fontSize: 54,
     fontWeight: '900',
     marginBottom: 12,
     textAlign: 'center',
   },
   bodyText: {
-    color: '#D9C7AD',
+    color: '#B0BEC5',
     fontSize: 17,
     lineHeight: 25,
     marginBottom: 10,
   },
   voteButton: {
-    backgroundColor: '#150D08',
-    borderColor: '#49301B',
+    backgroundColor: '#0F1D2E',
+    borderColor: '#2C3E50',
     borderRadius: 16,
     borderWidth: 1,
     marginBottom: 10,
     padding: 15,
   },
   voteButtonSelected: {
-    backgroundColor: '#4B321D',
-    borderColor: '#E8B45D',
+    backgroundColor: '#1A3A5C',
+    borderColor: '#1565C0',
   },
   voteButtonText: {
-    color: '#FFF4E2',
+    color: '#FFFFFF',
     fontSize: 17,
     fontWeight: '800',
-  },
-  settingRow: {
-    marginBottom: 18,
   },
   settingLabel: {
-    color: '#FFF4E2',
-    fontSize: 17,
-    fontWeight: '800',
-    marginBottom: 10,
-  },
-  settingButtons: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  optionButton: {
-    backgroundColor: '#150D08',
-    borderColor: '#49301B',
-    borderRadius: 14,
-    borderWidth: 1,
-    flex: 1,
-    paddingVertical: 12,
-  },
-  optionButtonSelected: {
-    backgroundColor: '#4B321D',
-    borderColor: '#E8B45D',
-  },
-  optionButtonText: {
-    color: '#FFF4E2',
+    color: '#CFD8DC',
     fontSize: 15,
-    fontWeight: '900',
-    textAlign: 'center',
+    fontWeight: '700',
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  roundBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#1565C0',
+    borderRadius: 12,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  roundBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "El Impostor Biblico",
-    "slug": "impostor-biblico-android",
+    "slug": "app-impostor-biblico",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -22,6 +22,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "702a1d3b-978f-448a-994c-0524bf2351af"
+      }
+    },
+    "owner": "rukawua26s-organization"
   }
 }

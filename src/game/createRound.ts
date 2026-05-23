@@ -1,4 +1,5 @@
 import { bibleDeck } from '../data/bibleDeck';
+import { impostorPhrases } from '../data/impostorPhrases';
 import type { Player, Round } from '../types/game';
 
 function randomIndex(max: number) {
@@ -9,6 +10,7 @@ export function createRound(players: Player[]): Round {
   return {
     word: bibleDeck[randomIndex(bibleDeck.length)],
     impostorId: players[randomIndex(players.length)].id,
+    impostorPhrase: impostorPhrases[randomIndex(impostorPhrases.length)],
   };
 }
 
