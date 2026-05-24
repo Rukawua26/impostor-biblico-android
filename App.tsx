@@ -1,7 +1,9 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -37,6 +39,7 @@ export default function App() {
   const [round, setRound] = useState<Round | null>(null);
   const [revealIndex, setRevealIndex] = useState(0);
   const [cardVisible, setCardVisible] = useState(false);
+  const [curtainLifted, setCurtainLifted] = useState(false);
   const [selectedVoteId, setSelectedVoteId] = useState<number | null>(null);
   const [discussionTimeLeft, setDiscussionTimeLeft] = useState(0);
   const [voteTimeLeft, setVoteTimeLeft] = useState(0);
@@ -84,6 +87,20 @@ export default function App() {
     (id) => activePlayers.some((player) => player.id === id) && !visibleEliminatedIds.includes(id),
   ) ?? [];
   const selectedWasImpostor = !!selectedVoteId && !!round?.impostorIds.includes(selectedVoteId);
+  const curtainPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => phase === 'reveal' && cardVisible && !curtainLifted,
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          phase === 'reveal' && cardVisible && !curtainLifted && Math.abs(gesture.dy) > 8,
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dy < -35) {
+            setCurtainLifted(true);
+          }
+        },
+      }),
+    [cardVisible, curtainLifted, phase],
+  );
 
   useEffect(() => {
     if (phase !== 'discussion' || discussionTimeLeft <= 0) return;
@@ -159,6 +176,7 @@ export default function App() {
     setRound(createRound(players, settings.impostorCount, settings.categoryId));
     setRevealIndex(0);
     setCardVisible(false);
+    setCurtainLifted(false);
     setSelectedVoteId(null);
     setDiscussionTimeLeft(settings.discussionMinutes * 60);
     setVoteTimeLeft(settings.voteMinutes * 60);
@@ -181,18 +199,23 @@ export default function App() {
   function continueReveal() {
     if (!cardVisible) {
       setCardVisible(true);
+      setCurtainLifted(false);
       return;
     }
+
+    if (!curtainLifted) return;
 
     if (revealIndex === activePlayers.length - 1) {
       setPhase('discussion');
       setCardVisible(false);
+      setCurtainLifted(false);
       setDiscussionTimeLeft(settings.discussionMinutes * 60);
       return;
     }
 
     setRevealIndex((current) => current + 1);
     setCardVisible(false);
+    setCurtainLifted(false);
   }
 
   function goToVote() {
@@ -292,6 +315,7 @@ export default function App() {
     setRoundNumber((current) => current + 1);
     setDiscussionTimeLeft(settings.discussionMinutes * 60);
     setCardVisible(false);
+    setCurtainLifted(false);
     setSelectedVoteId(null);
     setVoterIndex(0);
     setVotes({});
@@ -304,6 +328,8 @@ export default function App() {
     setPhase('setup');
     setRevealIndex(0);
     setCardVisible(false);
+    setCurtainLifted(false);
+    setCurtainLifted(false);
     setSelectedVoteId(null);
     setRound(null);
     setSetupMessage('');
@@ -510,7 +536,8 @@ export default function App() {
               Turno de {currentPlayer.name}
             </Text>
             <Text style={styles.helperText}>
-              Solo esta persona debe mirar la pantalla.
+              Solo esta persona debe mirar la pantalla. El rol esta cubierto por
+              un telon para evitar toques accidentales.
             </Text>
             <View style={styles.roleCard}>
               {cardVisible ? (
@@ -547,10 +574,34 @@ export default function App() {
                   </Text>
                 </>
               )}
+              {cardVisible && !curtainLifted && (
+                <View style={styles.curtain} {...curtainPanResponder.panHandlers}>
+                  <Image
+                    source={require('./assets/curtain-character.png')}
+                    style={styles.curtainCharacter}
+                  />
+                  <Text style={styles.curtainTitle}>Telon cerrado</Text>
+                  <Text style={styles.curtainText}>
+                    Desliza hacia arriba para ver tu rol.
+                  </Text>
+                  <Text style={styles.curtainArrow}>↑</Text>
+                </View>
+              )}
             </View>
-            <Pressable style={styles.primaryButton} onPress={continueReveal}>
+            <Pressable
+              style={[
+                styles.primaryButton,
+                cardVisible && !curtainLifted && styles.disabledButton,
+              ]}
+              disabled={cardVisible && !curtainLifted}
+              onPress={continueReveal}
+            >
               <Text style={styles.primaryButtonText}>
-                {cardVisible ? 'Ocultar y pasar' : 'Ver mi rol'}
+                {!cardVisible
+                  ? 'Ver mi rol'
+                  : curtainLifted
+                    ? 'Ocultar y pasar'
+                    : 'Levanta el telon primero'}
               </Text>
             </Pressable>
           </View>
@@ -858,7 +909,9 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     minHeight: 220,
+    overflow: 'hidden',
     padding: 20,
+    position: 'relative',
   },
   roleLabel: {
     color: '#90A4AE',
@@ -915,6 +968,43 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     lineHeight: 26,
     textAlign: 'center',
+  },
+  curtain: {
+    alignItems: 'center',
+    backgroundColor: '#1565C0',
+    bottom: 0,
+    justifyContent: 'center',
+    left: 0,
+    padding: 20,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 5,
+  },
+  curtainCharacter: {
+    height: 112,
+    marginBottom: 12,
+    resizeMode: 'contain',
+    width: 112,
+  },
+  curtainTitle: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '900',
+    marginBottom: 6,
+  },
+  curtainText: {
+    color: '#E3F2FD',
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  curtainArrow: {
+    color: '#FFFFFF',
+    fontSize: 38,
+    fontWeight: '900',
+    marginTop: 6,
   },
   ruleText: {
     color: '#CFD8DC',
