@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: impostor-biblico-network-server
+    runtime: node
+    rootDir: network-server
+    buildCommand: npm install
+    startCommand: npm run start:tsx
+    healthCheckPath: /health
+    plan: free
