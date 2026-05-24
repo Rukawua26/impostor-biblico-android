@@ -789,7 +789,11 @@ export default function App() {
               Historia: {round?.word}
             </Text>
             <View style={styles.listCard}>
-              <Text style={styles.listTitle}>Referencia de la pista</Text>
+              <Text style={styles.listTitle}>Pista usada</Text>
+              <Text style={styles.listText}>{round?.impostorClue}</Text>
+            </View>
+            <View style={styles.listCard}>
+              <Text style={styles.listTitle}>Referencias biblicas</Text>
               <Text style={styles.listText}>{round?.impostorReference}</Text>
             </View>
             {gameResult === 'impostor' && (

@@ -4,6 +4,8 @@ export type ImpostorClue = {
   relatedWords: string[];
 };
 
+// References use book/chapter/verse locations compatible with the
+// Traduccion del Nuevo Mundo, without reproducing copyrighted Bible text.
 export const impostorClues: ImpostorClue[] = [
   {
     clue: 'La confianza peso mas que la apariencia.',
@@ -96,6 +98,11 @@ export const impostorClues: ImpostorClue[] = [
     relatedWords: ['Rut', 'Ruth y Noemi'],
   },
   {
+    clue: 'El animo llego antes de una responsabilidad grande.',
+    reference: 'Josue 1:6-9',
+    relatedWords: ['Josue'],
+  },
+  {
     clue: 'El valor aparecio en el momento correcto para proteger a otros.',
     reference: 'Ester 4:14-16; 7:3-6',
     relatedWords: ['Ester', 'Ester salva a su pueblo'],
@@ -126,6 +133,36 @@ export const impostorClues: ImpostorClue[] = [
     relatedWords: ['Belen'],
   },
   {
+    clue: 'Un lugar importante vio gozo, tension y decisiones serias.',
+    reference: '2 Samuel 5:6-10; Lucas 19:41-44',
+    relatedWords: ['Jerusalen'],
+  },
+  {
+    clue: 'Un lugar humilde estuvo ligado a alguien que muchos no esperaban.',
+    reference: 'Mateo 2:23; Juan 1:45-46',
+    relatedWords: ['Nazaret'],
+  },
+  {
+    clue: 'Una region comun fue escenario de ensenanza y actividad constante.',
+    reference: 'Mateo 4:23; Marcos 1:14-15',
+    relatedWords: ['Galilea'],
+  },
+  {
+    clue: 'Un lugar de comienzo tambien recordo una perdida importante.',
+    reference: 'Genesis 2:8-17; 3:23-24',
+    relatedWords: ['Eden'],
+  },
+  {
+    clue: 'Un sitio recibio un nombre despues de una experiencia nocturna.',
+    reference: 'Genesis 28:10-19',
+    relatedWords: ['Betel'],
+  },
+  {
+    clue: 'Una ciudad antigua cayo de una forma poco comun.',
+    reference: 'Josue 6:1-20',
+    relatedWords: ['Jerico'],
+  },
+  {
     clue: 'La provision diaria enseno dependencia constante.',
     reference: 'Exodo 16:13-21',
     relatedWords: ['Mana'],
@@ -139,6 +176,21 @@ export const impostorClues: ImpostorClue[] = [
     clue: 'La luz pequena tenia que mantenerse lista.',
     reference: 'Mateo 25:1-13',
     relatedWords: ['Lampara', 'Aceite'],
+  },
+  {
+    clue: 'Un mensaje escrito debia leerse y conservarse con cuidado.',
+    reference: 'Jeremias 36:1-4; Lucas 4:16-20',
+    relatedWords: ['Rollo'],
+  },
+  {
+    clue: 'Una prenda llego a ser parte de una perdida dolorosa.',
+    reference: 'Genesis 37:3, 31-34',
+    relatedWords: ['Tunica'],
+  },
+  {
+    clue: 'Algo pequeno podia crecer mucho bajo buenas condiciones.',
+    reference: 'Mateo 13:31-32; Lucas 8:11-15',
+    relatedWords: ['Semilla'],
   },
   {
     clue: 'Algo pequeno mostro una actitud mayor que la cantidad.',
