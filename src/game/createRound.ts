@@ -1,4 +1,4 @@
-import { bibleDeck } from '../data/bibleDeck';
+import { getWordsForCategory } from '../data/bibleDeck';
 import { impostorPhrases } from '../data/impostorPhrases';
 import type { Player, Round } from '../types/game';
 
@@ -6,10 +6,19 @@ function randomIndex(max: number) {
   return Math.floor(Math.random() * max);
 }
 
-export function createRound(players: Player[]): Round {
+function pickImpostorIds(players: Player[], impostorCount: number) {
+  return [...players]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, impostorCount)
+    .map((player) => player.id);
+}
+
+export function createRound(players: Player[], impostorCount: number, categoryId: string): Round {
+  const words = getWordsForCategory(categoryId);
+
   return {
-    word: bibleDeck[randomIndex(bibleDeck.length)],
-    impostorId: players[randomIndex(players.length)].id,
+    word: words[randomIndex(words.length)],
+    impostorIds: pickImpostorIds(players, impostorCount),
     impostorPhrase: impostorPhrases[randomIndex(impostorPhrases.length)],
   };
 }

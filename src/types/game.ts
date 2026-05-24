@@ -13,14 +13,16 @@ export type Player = {
 };
 
 export type GameSettings = {
-  discussionSeconds: number;
-  voteSeconds: number;
+  discussionMinutes: number;
+  voteMinutes: number;
   maxRounds: number;
+  impostorCount: number;
+  categoryId: string;
 };
 
 export type Round = {
   word: string;
-  impostorId: number;
+  impostorIds: number[];
   impostorPhrase: string;
 };
 

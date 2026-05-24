@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { bibleCategories } from './src/data/bibleDeck';
 import { defaultPlayers } from './src/data/defaultPlayers';
 import { createRound, normalizePlayers } from './src/game/createRound';
 import type { GameResult, GameSettings, Phase, Player, Round } from './src/types/game';
@@ -21,9 +22,11 @@ type VoteTally = {
 };
 
 const defaultSettings: GameSettings = {
-  discussionSeconds: 90,
-  voteSeconds: 30,
+  discussionMinutes: 0,
+  voteMinutes: 0,
   maxRounds: 5,
+  impostorCount: 1,
+  categoryId: 'historias',
 };
 
 export default function App() {
@@ -48,19 +51,24 @@ export default function App() {
   const [voteMessage, setVoteMessage] = useState('');
   const [voteTally, setVoteTally] = useState<VoteTally[]>([]);
 
-  const impostorPlayer = activePlayers.find((player) => player.id === round?.impostorId);
+  const impostorPlayers = activePlayers.filter((player) => round?.impostorIds.includes(player.id));
   const currentPlayer = activePlayers[revealIndex];
   const currentVoter = activePlayers[voterIndex];
   const selectedPlayer = activePlayers.find((player) => player.id === selectedVoteId);
   const normalizedAll = useMemo(() => normalizePlayers(allPlayers), [allPlayers]);
-  const canStart = normalizedAll.length >= 3;
+  const canStart =
+    normalizedAll.length >= 3 &&
+    settings.discussionMinutes > 0 &&
+    settings.voteMinutes > 0 &&
+    settings.impostorCount > 0 &&
+    settings.impostorCount < normalizedAll.length;
   const visibleEliminatedIds = useMemo(() => {
-    if (selectedVoteId && selectedVoteId !== round?.impostorId) {
+    if (selectedVoteId) {
       return [...new Set([...eliminatedIds, selectedVoteId])];
     }
 
     return eliminatedIds;
-  }, [eliminatedIds, round?.impostorId, selectedVoteId]);
+  }, [eliminatedIds, selectedVoteId]);
   const visibleEliminatedPlayers = allPlayers.filter((player) =>
     visibleEliminatedIds.includes(player.id),
   );
@@ -72,6 +80,10 @@ export default function App() {
 
     return eligibleVoteIds.includes(player.id);
   });
+  const activeImpostorIds = round?.impostorIds.filter(
+    (id) => activePlayers.some((player) => player.id === id) && !visibleEliminatedIds.includes(id),
+  ) ?? [];
+  const selectedWasImpostor = !!selectedVoteId && !!round?.impostorIds.includes(selectedVoteId);
 
   useEffect(() => {
     if (phase !== 'discussion' || discussionTimeLeft <= 0) return;
@@ -101,7 +113,7 @@ export default function App() {
     if (phase === 'vote') return 'El grupo decide quien es el impostor.';
     if (phase === 'eliminated') return `${eliminatedPlayerName} fue eliminado.`;
     if (gameResult === 'innocents') return 'El grupo gano la partida.';
-    if (gameResult === 'impostor') return 'El impostor gano la partida.';
+    if (gameResult === 'impostor') return 'Los impostores ganaron la partida.';
     return '';
   }, [phase, roundNumber, settings.maxRounds, eliminatedPlayerName, gameResult]);
 
@@ -132,14 +144,24 @@ export default function App() {
       return;
     }
 
+    if (settings.discussionMinutes <= 0 || settings.voteMinutes <= 0) {
+      setSetupMessage('Coloca el tiempo de discusion y votacion en minutos.');
+      return;
+    }
+
+    if (settings.impostorCount <= 0 || settings.impostorCount >= players.length) {
+      setSetupMessage('La cantidad de impostores debe ser menor que la cantidad de jugadores.');
+      return;
+    }
+
     setAllPlayers(players);
     setActivePlayers(players);
-    setRound(createRound(players));
+    setRound(createRound(players, settings.impostorCount, settings.categoryId));
     setRevealIndex(0);
     setCardVisible(false);
     setSelectedVoteId(null);
-    setDiscussionTimeLeft(settings.discussionSeconds);
-    setVoteTimeLeft(settings.voteSeconds);
+    setDiscussionTimeLeft(settings.discussionMinutes * 60);
+    setVoteTimeLeft(settings.voteMinutes * 60);
     setRoundNumber(1);
     setEliminatedIds([]);
     setGameResult(null);
@@ -165,7 +187,7 @@ export default function App() {
     if (revealIndex === activePlayers.length - 1) {
       setPhase('discussion');
       setCardVisible(false);
-      setDiscussionTimeLeft(settings.discussionSeconds);
+      setDiscussionTimeLeft(settings.discussionMinutes * 60);
       return;
     }
 
@@ -174,7 +196,7 @@ export default function App() {
   }
 
   function goToVote() {
-    setVoteTimeLeft(settings.voteSeconds);
+    setVoteTimeLeft(settings.voteMinutes * 60);
     setSelectedVoteId(null);
     setVoterIndex(0);
     setVotes({});
@@ -202,7 +224,7 @@ export default function App() {
       setVoterIndex(0);
       setSelectedVoteId(null);
       setEligibleVoteIds(tiedPlayers.map((player) => player.playerId));
-      setVoteTimeLeft(settings.voteSeconds);
+      setVoteTimeLeft(settings.voteMinutes * 60);
       setVoteMessage(`Empate entre ${tiedPlayers.map((player) => player.name).join(', ')}. Voten de nuevo solo entre ellos.`);
       return;
     }
@@ -229,7 +251,9 @@ export default function App() {
   function handleVoteResult(eliminatedId: number) {
     setSelectedVoteId(eliminatedId);
 
-    if (eliminatedId === round?.impostorId) {
+    const remainingImpostorIds = activeImpostorIds.filter((id) => id !== eliminatedId);
+
+    if (round?.impostorIds.includes(eliminatedId) && remainingImpostorIds.length === 0) {
       setGameResult('innocents');
       setPhase('result');
       return;
@@ -250,7 +274,11 @@ export default function App() {
   function nextRound() {
     const remaining = activePlayers.filter((player) => player.id !== selectedVoteId);
 
-    if (remaining.length <= 2) {
+    const remainingImpostors = round?.impostorIds.filter((id) =>
+      remaining.some((player) => player.id === id),
+    ).length ?? 0;
+
+    if (remaining.length <= remainingImpostors * 2) {
       setGameResult('impostor');
       setPhase('result');
       return;
@@ -262,7 +290,7 @@ export default function App() {
     ]);
     setActivePlayers(remaining);
     setRoundNumber((current) => current + 1);
-    setDiscussionTimeLeft(settings.discussionSeconds);
+    setDiscussionTimeLeft(settings.discussionMinutes * 60);
     setCardVisible(false);
     setSelectedVoteId(null);
     setVoterIndex(0);
@@ -347,35 +375,67 @@ export default function App() {
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>Configuracion</Text>
 
-              <Text style={styles.settingLabel}>Tiempo de discusion (segundos)</Text>
+              <Text style={styles.settingLabel}>Categoria</Text>
+              <View style={styles.optionGrid}>
+                {bibleCategories.map((category) => (
+                  <Pressable
+                    key={category.id}
+                    style={[
+                      styles.categoryButton,
+                      settings.categoryId === category.id && styles.categoryButtonSelected,
+                    ]}
+                    onPress={() => setSettings((prev) => ({ ...prev, categoryId: category.id }))}
+                  >
+                    <Text style={styles.categoryButtonText}>{category.name}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <Text style={styles.settingLabel}>Cantidad de impostores</Text>
               <TextInput
                 style={styles.input}
-                value={String(settings.discussionSeconds)}
+                value={String(settings.impostorCount)}
                 onChangeText={(text) => {
-                  const num = parseInt(text, 10);
-                  if (!isNaN(num) && num > 0) {
-                    setSettings((prev) => ({ ...prev, discussionSeconds: num }));
+                  const num = parseInt(text || '0', 10);
+                  if (!isNaN(num) && num >= 0) {
+                    setSettings((prev) => ({ ...prev, impostorCount: num }));
                   }
                 }}
                 keyboardType="number-pad"
                 returnKeyType="done"
-                placeholder="90"
+                placeholder="1"
                 placeholderTextColor="#607D8B"
               />
 
-              <Text style={styles.settingLabel}>Tiempo de votacion (segundos)</Text>
+              <Text style={styles.settingLabel}>Tiempo de discusion (minutos)</Text>
               <TextInput
                 style={styles.input}
-                value={String(settings.voteSeconds)}
+                value={String(settings.discussionMinutes)}
                 onChangeText={(text) => {
-                  const num = parseInt(text, 10);
-                  if (!isNaN(num) && num > 0) {
-                    setSettings((prev) => ({ ...prev, voteSeconds: num }));
+                  const num = parseInt(text || '0', 10);
+                  if (!isNaN(num) && num >= 0) {
+                    setSettings((prev) => ({ ...prev, discussionMinutes: num }));
                   }
                 }}
                 keyboardType="number-pad"
                 returnKeyType="done"
-                placeholder="30"
+                placeholder="0"
+                placeholderTextColor="#607D8B"
+              />
+
+              <Text style={styles.settingLabel}>Tiempo de votacion (minutos)</Text>
+              <TextInput
+                style={styles.input}
+                value={String(settings.voteMinutes)}
+                onChangeText={(text) => {
+                  const num = parseInt(text || '0', 10);
+                  if (!isNaN(num) && num >= 0) {
+                    setSettings((prev) => ({ ...prev, voteMinutes: num }));
+                  }
+                }}
+                keyboardType="number-pad"
+                returnKeyType="done"
+                placeholder="0"
                 placeholderTextColor="#607D8B"
               />
 
@@ -410,7 +470,8 @@ export default function App() {
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Como se juega</Text>
             <Text style={styles.ruleText}>
-              1. Un jugador sera el impostor y no vera la historia biblica.
+              1. Uno o varios jugadores seran impostores y no veran la historia
+              biblica.
             </Text>
             <Text style={styles.ruleText}>
               2. Los demas jugadores ven la misma historia solo una vez y deben
@@ -424,7 +485,7 @@ export default function App() {
               telefono.
             </Text>
             <Text style={styles.ruleText}>
-              5. Si el mas votado es el impostor, el grupo gana.
+              5. Si eliminan a todos los impostores, el grupo gana.
             </Text>
             <Text style={styles.ruleText}>
               6. Si votan a un inocente, ese jugador queda eliminado y la
@@ -434,8 +495,8 @@ export default function App() {
               7. Si hay empate, se repite la votacion solo entre empatados.
             </Text>
             <Text style={styles.ruleText}>
-              8. Si el impostor sobrevive {settings.maxRounds} rondas, gana la
-              partida.
+              8. Si queda al menos un impostor tras {settings.maxRounds} rondas,
+              los impostores ganan la partida.
             </Text>
             <Pressable style={styles.primaryButton} onPress={beginReveal}>
               <Text style={styles.primaryButtonText}>Entendido</Text>
@@ -453,9 +514,9 @@ export default function App() {
             </Text>
             <View style={styles.roleCard}>
               {cardVisible ? (
-                currentPlayer.id === round?.impostorId ? (
+                round?.impostorIds.includes(currentPlayer.id) ? (
                   <>
-                    <Text style={styles.roleLabel}>Tu eres el IMPOSTOR</Text>
+                    <Text style={styles.roleLabel}>Tu eres IMPOSTOR</Text>
                     <Text style={styles.impostorText}>Impostor</Text>
                     <Text style={styles.roleHint}>
                       No sabes cual es la historia. Escucha a los demas y finge.
@@ -504,7 +565,7 @@ export default function App() {
             </View>
             <Text style={styles.timerText}>{formatTime(discussionTimeLeft)}</Text>
             <Text style={styles.bodyText}>
-              Cada jugador da una pista breve. El impostor debe fingir.
+              Cada jugador da una pista breve. Los impostores deben fingir.
             </Text>
             <Text style={styles.helperText}>
               Tiempo restante de discusion. Pueden avanzar antes si todos estan
@@ -578,7 +639,9 @@ export default function App() {
               {eliminatedPlayerName} fue eliminado
             </Text>
             <Text style={styles.bodyText}>
-              No era el impostor. El juego continua.
+              {selectedWasImpostor
+                ? 'Era impostor, pero todavia queda otro impostor en la partida.'
+                : 'No era impostor. El juego continua.'}
             </Text>
             <Text style={styles.bodyText}>
               Quedan {activePlayers.length - 1} jugadores en la partida.
@@ -621,10 +684,10 @@ export default function App() {
             <Text style={styles.sectionTitle}>
               {gameResult === 'innocents'
                 ? 'El grupo gano la partida'
-                : 'El impostor gano la partida'}
+                : 'Los impostores ganaron la partida'}
             </Text>
             <Text style={styles.bodyText}>
-              Impostor: {impostorPlayer?.name}
+              Impostores: {impostorPlayers.map((player) => player.name).join(', ')}
             </Text>
             {selectedVoteId ? (
               <Text style={styles.bodyText}>
@@ -654,8 +717,8 @@ export default function App() {
             </Text>
             {gameResult === 'impostor' && (
               <Text style={styles.bodyText}>
-                El impostor sobrevivio {settings.maxRounds} rondas sin ser
-                descubierto.
+                Al menos un impostor sobrevivio {settings.maxRounds} rondas sin
+                ser descubierto.
               </Text>
             )}
             <Pressable style={styles.primaryButton} onPress={startGame}>
@@ -925,6 +988,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 8,
     marginTop: 12,
+  },
+  optionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 8,
+  },
+  categoryButton: {
+    backgroundColor: '#0F1D2E',
+    borderColor: '#2C3E50',
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  categoryButtonSelected: {
+    backgroundColor: '#1A3A5C',
+    borderColor: '#64B5F6',
+  },
+  categoryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
   roundBadge: {
     alignSelf: 'flex-start',
