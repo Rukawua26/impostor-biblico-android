@@ -1,5 +1,5 @@
 import { getWordsForCategory } from '../data/bibleDeck';
-import { impostorPhrases } from '../data/impostorPhrases';
+import { fallbackImpostorClue, impostorClues } from '../data/impostorPhrases';
 import type { Player, Round } from '../types/game';
 
 function randomIndex(max: number) {
@@ -15,11 +15,17 @@ function pickImpostorIds(players: Player[], impostorCount: number) {
 
 export function createRound(players: Player[], impostorCount: number, categoryId: string): Round {
   const words = getWordsForCategory(categoryId);
+  const word = words[randomIndex(words.length)];
+  const matchingClues = impostorClues.filter((clue) => clue.relatedWords.includes(word));
+  const selectedClue = matchingClues.length
+    ? matchingClues[randomIndex(matchingClues.length)]
+    : fallbackImpostorClue;
 
   return {
-    word: words[randomIndex(words.length)],
+    word,
     impostorIds: pickImpostorIds(players, impostorCount),
-    impostorPhrase: impostorPhrases[randomIndex(impostorPhrases.length)],
+    impostorClue: selectedClue.clue,
+    impostorReference: selectedClue.reference,
   };
 }
 

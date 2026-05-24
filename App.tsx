@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   Image,
   KeyboardAvoidingView,
   PanResponder,
@@ -53,6 +54,7 @@ export default function App() {
   const [eligibleVoteIds, setEligibleVoteIds] = useState<number[] | null>(null);
   const [voteMessage, setVoteMessage] = useState('');
   const [voteTally, setVoteTally] = useState<VoteTally[]>([]);
+  const curtainTranslateY = useRef(new Animated.Value(0)).current;
 
   const impostorPlayers = activePlayers.filter((player) => round?.impostorIds.includes(player.id));
   const currentPlayer = activePlayers[revealIndex];
@@ -87,19 +89,34 @@ export default function App() {
     (id) => activePlayers.some((player) => player.id === id) && !visibleEliminatedIds.includes(id),
   ) ?? [];
   const selectedWasImpostor = !!selectedVoteId && !!round?.impostorIds.includes(selectedVoteId);
+  function resetCurtain() {
+    setCurtainLifted(false);
+    curtainTranslateY.setValue(0);
+  }
+
   const curtainPanResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => phase === 'reveal' && cardVisible && !curtainLifted,
         onMoveShouldSetPanResponder: (_, gesture) =>
           phase === 'reveal' && cardVisible && !curtainLifted && Math.abs(gesture.dy) > 8,
+        onPanResponderMove: (_, gesture) => {
+          curtainTranslateY.setValue(Math.min(0, Math.max(-170, gesture.dy)));
+        },
         onPanResponderRelease: (_, gesture) => {
           if (gesture.dy < -35) {
             setCurtainLifted(true);
           }
+
+          Animated.spring(curtainTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 70,
+            friction: 8,
+          }).start();
         },
       }),
-    [cardVisible, curtainLifted, phase],
+    [cardVisible, curtainLifted, curtainTranslateY, phase],
   );
 
   useEffect(() => {
@@ -176,7 +193,7 @@ export default function App() {
     setRound(createRound(players, settings.impostorCount, settings.categoryId));
     setRevealIndex(0);
     setCardVisible(false);
-    setCurtainLifted(false);
+    resetCurtain();
     setSelectedVoteId(null);
     setDiscussionTimeLeft(settings.discussionMinutes * 60);
     setVoteTimeLeft(settings.voteMinutes * 60);
@@ -199,7 +216,7 @@ export default function App() {
   function continueReveal() {
     if (!cardVisible) {
       setCardVisible(true);
-      setCurtainLifted(false);
+      resetCurtain();
       return;
     }
 
@@ -208,14 +225,14 @@ export default function App() {
     if (revealIndex === activePlayers.length - 1) {
       setPhase('discussion');
       setCardVisible(false);
-      setCurtainLifted(false);
+      resetCurtain();
       setDiscussionTimeLeft(settings.discussionMinutes * 60);
       return;
     }
 
     setRevealIndex((current) => current + 1);
     setCardVisible(false);
-    setCurtainLifted(false);
+    resetCurtain();
   }
 
   function goToVote() {
@@ -315,7 +332,7 @@ export default function App() {
     setRoundNumber((current) => current + 1);
     setDiscussionTimeLeft(settings.discussionMinutes * 60);
     setCardVisible(false);
-    setCurtainLifted(false);
+    resetCurtain();
     setSelectedVoteId(null);
     setVoterIndex(0);
     setVotes({});
@@ -328,8 +345,7 @@ export default function App() {
     setPhase('setup');
     setRevealIndex(0);
     setCardVisible(false);
-    setCurtainLifted(false);
-    setCurtainLifted(false);
+    resetCurtain();
     setSelectedVoteId(null);
     setRound(null);
     setSetupMessage('');
@@ -553,7 +569,7 @@ export default function App() {
                         Frase para comenzar:
                       </Text>
                       <Text style={styles.phraseText}>
-                        {round?.impostorPhrase}
+                        {round?.impostorClue}
                       </Text>
                     </View>
                   </>
@@ -575,7 +591,13 @@ export default function App() {
                 </>
               )}
               {cardVisible && !curtainLifted && (
-                <View style={styles.curtain} {...curtainPanResponder.panHandlers}>
+                <Animated.View
+                  style={[
+                    styles.curtain,
+                    { transform: [{ translateY: curtainTranslateY }] },
+                  ]}
+                  {...curtainPanResponder.panHandlers}
+                >
                   <Image
                     source={require('./assets/curtain-character.png')}
                     style={styles.curtainCharacter}
@@ -585,7 +607,7 @@ export default function App() {
                     Desliza hacia arriba para ver tu rol.
                   </Text>
                   <Text style={styles.curtainArrow}>↑</Text>
-                </View>
+                </Animated.View>
               )}
             </View>
             <Pressable
@@ -766,6 +788,10 @@ export default function App() {
             <Text style={styles.bodyText}>
               Historia: {round?.word}
             </Text>
+            <View style={styles.listCard}>
+              <Text style={styles.listTitle}>Referencia de la pista</Text>
+              <Text style={styles.listText}>{round?.impostorReference}</Text>
+            </View>
             {gameResult === 'impostor' && (
               <Text style={styles.bodyText}>
                 Al menos un impostor sobrevivio {settings.maxRounds} rondas sin

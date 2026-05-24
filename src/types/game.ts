@@ -23,7 +23,8 @@ export type GameSettings = {
 export type Round = {
   word: string;
   impostorIds: number[];
-  impostorPhrase: string;
+  impostorClue: string;
+  impostorReference: string;
 };
 
 export type GameResult = 'innocents' | 'impostor' | null;
