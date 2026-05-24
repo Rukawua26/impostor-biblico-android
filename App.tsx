@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { bibleCategories } from './src/data/bibleDeck';
+import { IntroScreen } from './src/components/IntroScreen';
 import { defaultPlayers } from './src/data/defaultPlayers';
 import { createRound, normalizePlayers } from './src/game/createRound';
 import type { GameResult, GameSettings, Phase, Player, Round } from './src/types/game';
@@ -33,6 +34,7 @@ const defaultSettings: GameSettings = {
 };
 
 export default function App() {
+  const [showIntro, setShowIntro] = useState(true);
   const [phase, setPhase] = useState<Phase>('setup');
   const [allPlayers, setAllPlayers] = useState<Player[]>(defaultPlayers);
   const [activePlayers, setActivePlayers] = useState<Player[]>([]);
@@ -366,6 +368,10 @@ export default function App() {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   }
 
+  if (showIntro) {
+    return <IntroScreen onFinish={() => setShowIntro(false)} />;
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -377,6 +383,7 @@ export default function App() {
           <Text style={styles.kicker}>Juego presencial multijugador</Text>
           <Text style={styles.title}>El Impostor Biblico</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+          <View style={styles.heroLine} />
         </View>
 
         {phase === 'setup' && (
@@ -820,15 +827,21 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D1B2A',
+    backgroundColor: '#071827',
   },
   content: {
     flexGrow: 1,
-    padding: 20,
+    padding: 18,
     paddingTop: 64,
   },
   hero: {
-    marginBottom: 24,
+    backgroundColor: '#0D1B2A',
+    borderColor: '#183B59',
+    borderRadius: 30,
+    borderWidth: 1,
+    marginBottom: 18,
+    overflow: 'hidden',
+    padding: 22,
   },
   kicker: {
     color: '#64B5F6',
@@ -839,9 +852,10 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#FFFFFF',
-    fontSize: 42,
+    fontSize: 38,
     fontWeight: '900',
-    lineHeight: 46,
+    letterSpacing: -0.8,
+    lineHeight: 42,
     marginTop: 10,
   },
   subtitle: {
@@ -850,19 +864,27 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginTop: 12,
   },
+  heroLine: {
+    backgroundColor: '#1565C0',
+    borderRadius: 999,
+    height: 4,
+    marginTop: 18,
+    width: 92,
+  },
   card: {
-    backgroundColor: '#1B2838',
-    borderColor: '#2C3E50',
-    borderRadius: 28,
+    backgroundColor: '#102235',
+    borderColor: '#24445F',
+    borderRadius: 26,
     borderWidth: 1,
-    marginBottom: 16,
-    padding: 20,
+    marginBottom: 14,
+    padding: 18,
   },
   sectionTitle: {
     color: '#FFFFFF',
-    fontSize: 24,
+    fontSize: 23,
     fontWeight: '800',
-    marginBottom: 16,
+    letterSpacing: -0.2,
+    marginBottom: 14,
   },
   playerRow: {
     flexDirection: 'row',
@@ -870,8 +892,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   input: {
-    backgroundColor: '#0F1D2E',
-    borderColor: '#2C3E50',
+    backgroundColor: '#071827',
+    borderColor: '#24445F',
     borderRadius: 16,
     borderWidth: 1,
     color: '#FFFFFF',
@@ -883,7 +905,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     alignItems: 'center',
     backgroundColor: '#1565C0',
-    borderRadius: 18,
+    borderRadius: 16,
     marginTop: 16,
     paddingVertical: 15,
   },
@@ -894,8 +916,9 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     alignItems: 'center',
-    borderColor: '#1565C0',
-    borderRadius: 18,
+    backgroundColor: '#0D1B2A',
+    borderColor: '#24445F',
+    borderRadius: 16,
     borderWidth: 1,
     marginTop: 8,
     paddingVertical: 14,
@@ -935,8 +958,10 @@ const styles = StyleSheet.create({
   },
   roleCard: {
     alignItems: 'center',
-    backgroundColor: '#0F1D2E',
-    borderRadius: 24,
+    backgroundColor: '#071827',
+    borderColor: '#24445F',
+    borderRadius: 22,
+    borderWidth: 1,
     justifyContent: 'center',
     minHeight: 220,
     overflow: 'hidden',
@@ -977,7 +1002,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   phraseCard: {
-    backgroundColor: '#1A3A5C',
+    backgroundColor: '#123D63',
+    borderColor: '#2E6B9A',
+    borderWidth: 1,
     borderRadius: 16,
     marginTop: 20,
     padding: 16,
@@ -1056,16 +1083,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   listCard: {
-    backgroundColor: '#0F1D2E',
-    borderColor: '#2C3E50',
+    backgroundColor: '#071827',
+    borderColor: '#24445F',
     borderRadius: 16,
     borderWidth: 1,
     marginBottom: 12,
     padding: 14,
   },
   listCardMuted: {
-    backgroundColor: '#172230',
-    borderColor: '#2C3E50',
+    backgroundColor: '#0D1B2A',
+    borderColor: '#24445F',
     borderRadius: 16,
     borderWidth: 1,
     marginBottom: 12,
@@ -1086,16 +1113,16 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   voteButton: {
-    backgroundColor: '#0F1D2E',
-    borderColor: '#2C3E50',
+    backgroundColor: '#071827',
+    borderColor: '#24445F',
     borderRadius: 16,
     borderWidth: 1,
     marginBottom: 10,
     padding: 15,
   },
   voteButtonSelected: {
-    backgroundColor: '#1A3A5C',
-    borderColor: '#1565C0',
+    backgroundColor: '#123D63',
+    borderColor: '#64B5F6',
   },
   voteButtonText: {
     color: '#FFFFFF',
@@ -1116,15 +1143,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   categoryButton: {
-    backgroundColor: '#0F1D2E',
-    borderColor: '#2C3E50',
+    backgroundColor: '#071827',
+    borderColor: '#24445F',
     borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   categoryButtonSelected: {
-    backgroundColor: '#1A3A5C',
+    backgroundColor: '#123D63',
     borderColor: '#64B5F6',
   },
   categoryButtonText: {
