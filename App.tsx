@@ -399,7 +399,7 @@ export default function App() {
                     style={styles.input}
                     value={player.name}
                     placeholder={`Jugador ${index + 1}`}
-                    placeholderTextColor="#607D8B"
+                    placeholderTextColor="#9788f7"
                     returnKeyType="done"
                     onChangeText={(name) => updatePlayerName(player.id, name)}
                   />
@@ -453,7 +453,7 @@ export default function App() {
                 keyboardType="number-pad"
                 returnKeyType="done"
                 placeholder="1"
-                placeholderTextColor="#607D8B"
+                placeholderTextColor="#9788f7"
               />
 
               <Text style={styles.settingLabel}>Tiempo de discusion (minutos)</Text>
@@ -469,7 +469,7 @@ export default function App() {
                 keyboardType="number-pad"
                 returnKeyType="done"
                 placeholder="0"
-                placeholderTextColor="#607D8B"
+                placeholderTextColor="#9788f7"
               />
 
               <Text style={styles.settingLabel}>Tiempo de votacion (minutos)</Text>
@@ -485,7 +485,7 @@ export default function App() {
                 keyboardType="number-pad"
                 returnKeyType="done"
                 placeholder="0"
-                placeholderTextColor="#607D8B"
+                placeholderTextColor="#9788f7"
               />
 
               <Text style={styles.settingLabel}>Rondas maximas</Text>
@@ -501,7 +501,7 @@ export default function App() {
                 keyboardType="number-pad"
                 returnKeyType="done"
                 placeholder="5"
-                placeholderTextColor="#607D8B"
+                placeholderTextColor="#9788f7"
               />
 
               <Pressable
@@ -827,7 +827,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#071827',
+    backgroundColor: '#050B1E',
   },
   content: {
     flexGrow: 1,
@@ -835,16 +835,16 @@ const styles = StyleSheet.create({
     paddingTop: 64,
   },
   hero: {
-    backgroundColor: '#0D1B2A',
-    borderColor: '#183B59',
-    borderRadius: 30,
+    backgroundColor: '#081333',
+    borderColor: '#263D8F',
+    borderRadius: 34,
     borderWidth: 1,
     marginBottom: 18,
     overflow: 'hidden',
     padding: 22,
   },
   kicker: {
-    color: '#64B5F6',
+    color: '#37e895',
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 1.5,
@@ -859,22 +859,22 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   subtitle: {
-    color: '#90A4AE',
+    color: '#9788f7',
     fontSize: 17,
     lineHeight: 24,
     marginTop: 12,
   },
   heroLine: {
-    backgroundColor: '#1565C0',
+    backgroundColor: '#006eff',
     borderRadius: 999,
     height: 4,
     marginTop: 18,
     width: 92,
   },
   card: {
-    backgroundColor: '#102235',
-    borderColor: '#24445F',
-    borderRadius: 26,
+    backgroundColor: '#0B1638',
+    borderColor: '#2D3D89',
+    borderRadius: 32,
     borderWidth: 1,
     marginBottom: 14,
     padding: 18,
@@ -892,8 +892,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   input: {
-    backgroundColor: '#071827',
-    borderColor: '#24445F',
+    backgroundColor: '#050B1E',
+    borderColor: '#2D3D89',
     borderRadius: 16,
     borderWidth: 1,
     color: '#FFFFFF',
@@ -904,8 +904,8 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#1565C0',
-    borderRadius: 16,
+    backgroundColor: '#006eff',
+    borderRadius: 20,
     marginTop: 16,
     paddingVertical: 15,
   },
@@ -916,15 +916,15 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#0D1B2A',
-    borderColor: '#24445F',
-    borderRadius: 16,
+    backgroundColor: '#081333',
+    borderColor: '#2D3D89',
+    borderRadius: 20,
     borderWidth: 1,
     marginTop: 8,
     paddingVertical: 14,
   },
   secondaryButtonText: {
-    color: '#64B5F6',
+    color: '#37e895',
     fontSize: 16,
     fontWeight: '800',
   },
@@ -933,7 +933,7 @@ const styles = StyleSheet.create({
   },
   smallButton: {
     alignItems: 'center',
-    backgroundColor: '#EF5350',
+    backgroundColor: '#ff4a48',
     borderRadius: 14,
     justifyContent: 'center',
     minWidth: 44,
@@ -945,21 +945,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   helperText: {
-    color: '#90A4AE',
+    color: '#9788f7',
     fontSize: 15,
     lineHeight: 21,
     marginBottom: 16,
   },
   warningText: {
-    color: '#EF9A9A',
+    color: '#ff4a48',
     fontSize: 15,
     fontWeight: '800',
     marginTop: 12,
   },
   roleCard: {
     alignItems: 'center',
-    backgroundColor: '#071827',
-    borderColor: '#24445F',
+    backgroundColor: '#050B1E',
+    borderColor: '#2D3D89',
     borderRadius: 22,
     borderWidth: 1,
     justifyContent: 'center',
@@ -969,7 +969,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   roleLabel: {
-    color: '#90A4AE',
+    color: '#9788f7',
     fontSize: 14,
     fontWeight: '800',
     letterSpacing: 1,
@@ -983,7 +983,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   impostorText: {
-    color: '#EF5350',
+    color: '#ff4a48',
     fontSize: 42,
     fontWeight: '900',
     textAlign: 'center',
@@ -995,15 +995,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   roleHint: {
-    color: '#B0BEC5',
+    color: '#C8C1FF',
     fontSize: 16,
     lineHeight: 23,
     marginTop: 16,
     textAlign: 'center',
   },
   phraseCard: {
-    backgroundColor: '#123D63',
-    borderColor: '#2E6B9A',
+    backgroundColor: '#1A2460',
+    borderColor: '#9788f7',
     borderWidth: 1,
     borderRadius: 16,
     marginTop: 20,
@@ -1011,7 +1011,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   phraseLabel: {
-    color: '#64B5F6',
+    color: '#37e895',
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.5,
@@ -1028,7 +1028,7 @@ const styles = StyleSheet.create({
   },
   curtain: {
     alignItems: 'center',
-    backgroundColor: '#1565C0',
+    backgroundColor: '#006eff',
     bottom: 0,
     justifyContent: 'center',
     left: 0,
@@ -1051,7 +1051,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   curtainText: {
-    color: '#E3F2FD',
+    color: '#DCD8FF',
     fontSize: 16,
     fontWeight: '700',
     lineHeight: 22,
@@ -1064,42 +1064,42 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   ruleText: {
-    color: '#CFD8DC',
+    color: '#DCD8FF',
     fontSize: 16,
     lineHeight: 24,
     marginBottom: 10,
   },
   timerText: {
-    color: '#64B5F6',
+    color: '#37e895',
     fontSize: 54,
     fontWeight: '900',
     marginBottom: 12,
     textAlign: 'center',
   },
   bodyText: {
-    color: '#B0BEC5',
+    color: '#C8C1FF',
     fontSize: 17,
     lineHeight: 25,
     marginBottom: 10,
   },
   listCard: {
-    backgroundColor: '#071827',
-    borderColor: '#24445F',
+    backgroundColor: '#050B1E',
+    borderColor: '#2D3D89',
     borderRadius: 16,
     borderWidth: 1,
     marginBottom: 12,
     padding: 14,
   },
   listCardMuted: {
-    backgroundColor: '#0D1B2A',
-    borderColor: '#24445F',
+    backgroundColor: '#081333',
+    borderColor: '#2D3D89',
     borderRadius: 16,
     borderWidth: 1,
     marginBottom: 12,
     padding: 14,
   },
   listTitle: {
-    color: '#64B5F6',
+    color: '#37e895',
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 0.5,
@@ -1107,22 +1107,22 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   listText: {
-    color: '#CFD8DC',
+    color: '#DCD8FF',
     fontSize: 15,
     fontWeight: '700',
     lineHeight: 22,
   },
   voteButton: {
-    backgroundColor: '#071827',
-    borderColor: '#24445F',
+    backgroundColor: '#050B1E',
+    borderColor: '#2D3D89',
     borderRadius: 16,
     borderWidth: 1,
     marginBottom: 10,
     padding: 15,
   },
   voteButtonSelected: {
-    backgroundColor: '#123D63',
-    borderColor: '#64B5F6',
+    backgroundColor: '#1A2460',
+    borderColor: '#37e895',
   },
   voteButtonText: {
     color: '#FFFFFF',
@@ -1130,7 +1130,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   settingLabel: {
-    color: '#CFD8DC',
+    color: '#DCD8FF',
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 8,
@@ -1143,16 +1143,16 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   categoryButton: {
-    backgroundColor: '#071827',
-    borderColor: '#24445F',
+    backgroundColor: '#050B1E',
+    borderColor: '#2D3D89',
     borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   categoryButtonSelected: {
-    backgroundColor: '#123D63',
-    borderColor: '#64B5F6',
+    backgroundColor: '#1A2460',
+    borderColor: '#37e895',
   },
   categoryButtonText: {
     color: '#FFFFFF',
@@ -1161,7 +1161,7 @@ const styles = StyleSheet.create({
   },
   roundBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#1565C0',
+    backgroundColor: '#006eff',
     borderRadius: 12,
     marginBottom: 12,
     paddingHorizontal: 14,

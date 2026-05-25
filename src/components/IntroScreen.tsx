@@ -1,12 +1,12 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, StyleSheet, Text, View } from 'react-native';
 
 type IntroScreenProps = {
   onFinish: () => void;
 };
 
-const INTRO_DURATION = 3600;
+const INTRO_DURATION = 5000;
 
 export function IntroScreen({ onFinish }: IntroScreenProps) {
   const logoScale = useRef(new Animated.Value(0.82)).current;
@@ -48,10 +48,10 @@ export function IntroScreen({ onFinish }: IntroScreenProps) {
         duration: 500,
         useNativeDriver: true,
       }),
-      Animated.delay(1250),
+      Animated.delay(2550),
       Animated.timing(screenOpacity, {
         toValue: 0,
-        duration: 420,
+        duration: 520,
         useNativeDriver: true,
       }),
     ]).start(onFinish);
@@ -61,7 +61,7 @@ export function IntroScreen({ onFinish }: IntroScreenProps) {
   }, [contentOpacity, contentTranslate, footerOpacity, logoOpacity, logoScale, onFinish, screenOpacity]);
 
   return (
-    <Animated.View style={[styles.container, { opacity: screenOpacity }]}> 
+    <Animated.View style={[styles.container, { opacity: screenOpacity }]}>
       <StatusBar style="light" />
       <View style={styles.orbOne} />
       <View style={styles.orbTwo} />
@@ -74,7 +74,7 @@ export function IntroScreen({ onFinish }: IntroScreenProps) {
           },
         ]}
       >
-        <Text style={styles.logoText}>IB</Text>
+        <Image source={require('../../assets/app-brand.png')} style={styles.logoImage} />
       </Animated.View>
       <Animated.View
         style={[
@@ -88,7 +88,7 @@ export function IntroScreen({ onFinish }: IntroScreenProps) {
         <Text style={styles.title}>El Impostor Biblico</Text>
         <Text style={styles.subtitle}>Juego presencial de deduccion</Text>
       </Animated.View>
-      <Animated.View style={[styles.footer, { opacity: footerOpacity }]}> 
+      <Animated.View style={[styles.footer, { opacity: footerOpacity }]}>
         <Text style={styles.footerText}>Todos los derechos reservados</Text>
         <Text style={styles.authorText}>Creado y desarrollado por Miguel Angel Oñate</Text>
       </Animated.View>
@@ -99,50 +99,50 @@ export function IntroScreen({ onFinish }: IntroScreenProps) {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    backgroundColor: '#071827',
+    backgroundColor: '#050B1E',
     flex: 1,
     justifyContent: 'center',
     overflow: 'hidden',
     padding: 28,
   },
   orbOne: {
-    backgroundColor: '#123D63',
+    backgroundColor: '#9788f7',
     borderRadius: 220,
     height: 440,
-    opacity: 0.38,
+    opacity: 0.28,
     position: 'absolute',
     right: -190,
     top: -120,
     width: 440,
   },
   orbTwo: {
-    backgroundColor: '#1565C0',
+    backgroundColor: '#006eff',
     borderRadius: 170,
     bottom: -120,
     height: 340,
     left: -160,
-    opacity: 0.22,
+    opacity: 0.28,
     position: 'absolute',
     width: 340,
   },
   logo: {
     alignItems: 'center',
-    backgroundColor: '#0D1B2A',
-    borderColor: '#64B5F6',
-    borderRadius: 58,
+    backgroundColor: '#050B1E',
+    borderColor: '#37e895',
+    borderRadius: 34,
     borderWidth: 2,
-    height: 116,
+    height: 170,
     justifyContent: 'center',
-    shadowColor: '#64B5F6',
+    shadowColor: '#37e895',
     shadowOpacity: 0.35,
     shadowRadius: 28,
-    width: 116,
+    width: 300,
   },
-  logoText: {
-    color: '#FFFFFF',
-    fontSize: 42,
-    fontWeight: '900',
-    letterSpacing: -2,
+  logoImage: {
+    borderRadius: 28,
+    height: 150,
+    resizeMode: 'cover',
+    width: 280,
   },
   content: {
     alignItems: 'center',
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   subtitle: {
-    color: '#B0BEC5',
+    color: '#9788f7',
     fontSize: 17,
     fontWeight: '700',
     marginTop: 10,
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     right: 24,
   },
   footerText: {
-    color: '#90A4AE',
+    color: '#37e895',
     fontSize: 13,
     fontWeight: '800',
     letterSpacing: 0.4,
