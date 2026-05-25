@@ -357,6 +357,7 @@ export default function App() {
 
   function resetGame() {
     setPhase('setup');
+    setActivePlayers([]);
     setRevealIndex(0);
     setCardVisible(false);
     resetCurtain();
@@ -367,6 +368,8 @@ export default function App() {
     setEliminatedIds([]);
     setGameResult(null);
     setEliminatedPlayerName('');
+    setDiscussionTimeLeft(0);
+    setVoteTimeLeft(0);
   }
 
   function formatTime(seconds: number) {
@@ -698,9 +701,10 @@ export default function App() {
               Cada jugador da una pista breve. Los impostores deben fingir.
             </Text>
             {firstSpeaker ? (
-              <View style={styles.listCard}>
-                <Text style={styles.listTitle}>Empieza</Text>
-                <Text style={styles.listText}>{firstSpeaker.name}</Text>
+              <View style={styles.firstSpeakerCard}>
+                <Text style={styles.firstSpeakerLabel}>Empieza</Text>
+                <Text style={styles.firstSpeakerName}>{firstSpeaker.name}</Text>
+                <Text style={styles.firstSpeakerHint}>Luego sigan en sentido horario.</Text>
               </View>
             ) : null}
             <Text style={styles.helperText}>
@@ -764,6 +768,9 @@ export default function App() {
             <Pressable style={styles.secondaryButton} onPress={startGame}>
               <Text style={styles.secondaryButtonText}>Nueva partida</Text>
             </Pressable>
+            <Pressable style={styles.secondaryButton} onPress={resetGame}>
+              <Text style={styles.secondaryButtonText}>Editar partida</Text>
+            </Pressable>
           </View>
         )}
 
@@ -772,7 +779,7 @@ export default function App() {
             <Text style={styles.sectionTitle}>
               {eliminatedPlayerName} fue eliminado
             </Text>
-            <Text style={styles.bodyText}>
+            <Text style={selectedWasImpostor ? styles.successMessageText : styles.dangerMessageText}>
               {selectedWasImpostor
                 ? 'Era impostor, pero todavia queda otro impostor en la partida.'
                 : 'No era impostor. El juego continua.'}
@@ -1024,6 +1031,20 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 12,
   },
+  successMessageText: {
+    color: '#37e895',
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 28,
+    marginBottom: 12,
+  },
+  dangerMessageText: {
+    color: '#ff4a48',
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 28,
+    marginBottom: 12,
+  },
   roleCard: {
     alignItems: 'center',
     backgroundColor: '#050B1E',
@@ -1149,6 +1170,44 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 25,
     marginBottom: 10,
+  },
+  firstSpeakerCard: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: '#081333',
+    borderColor: '#37e895',
+    borderRadius: 26,
+    borderWidth: 2,
+    marginBottom: 16,
+    minWidth: '58%',
+    paddingHorizontal: 22,
+    paddingVertical: 20,
+    shadowColor: '#37e895',
+    shadowOpacity: 0.28,
+    shadowRadius: 20,
+  },
+  firstSpeakerLabel: {
+    color: '#9788f7',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1.4,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  firstSpeakerName: {
+    color: '#37e895',
+    fontSize: 34,
+    fontWeight: '900',
+    lineHeight: 40,
+    textAlign: 'center',
+  },
+  firstSpeakerHint: {
+    color: '#DCD8FF',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+    marginTop: 10,
+    textAlign: 'center',
   },
   listCard: {
     backgroundColor: '#050B1E',
