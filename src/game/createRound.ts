@@ -5,8 +5,14 @@ function randomIndex(max: number) {
   return Math.floor(Math.random() * max);
 }
 
-function pickImpostorIds(players: Player[], impostorCount: number) {
-  return [...players]
+function pickImpostorIds(players: Player[], impostorCount: number, recentImpostorNames: string[]) {
+  const recentNameSet = new Set(recentImpostorNames.map((name) => name.toLocaleLowerCase()));
+  const eligiblePlayers = players.filter(
+    (player) => !recentNameSet.has(player.name.toLocaleLowerCase()),
+  );
+  const pool = eligiblePlayers.length >= impostorCount ? eligiblePlayers : players;
+
+  return [...pool]
     .sort(() => Math.random() - 0.5)
     .slice(0, impostorCount)
     .map((player) => player.id);
@@ -17,6 +23,7 @@ export function createRound(
   impostorCount: number,
   categoryId: string,
   usedWords: string[],
+  recentImpostorNames: string[],
 ): Round {
   const entries = getEntriesForCategory(categoryId);
   const usedWordSet = new Set(usedWords.map((word) => word.toLocaleLowerCase()));
@@ -27,7 +34,7 @@ export function createRound(
 
   return {
     word: selectedEntry.word,
-    impostorIds: pickImpostorIds(players, impostorCount),
+    impostorIds: pickImpostorIds(players, impostorCount, recentImpostorNames),
     impostorClue: selectedEntry.clue,
     impostorReference: selectedEntry.references,
     firstSpeakerId: firstSpeaker.id,

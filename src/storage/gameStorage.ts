@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const FREQUENT_PLAYERS_KEY = 'impostor-biblico.frequentPlayers';
 const USED_WORDS_KEY = 'impostor-biblico.usedWords';
+const RECENT_IMPOSTORS_KEY = 'impostor-biblico.recentImpostors';
 
 function parseStringArray(value: string | null) {
   if (!value) return [];
@@ -62,4 +63,14 @@ export async function saveUsedWords(words: string[]) {
 
   await AsyncStorage.setItem(USED_WORDS_KEY, JSON.stringify(cleanWords));
   return cleanWords;
+}
+
+export async function loadRecentImpostors() {
+  return parseStringArray(await AsyncStorage.getItem(RECENT_IMPOSTORS_KEY));
+}
+
+export async function saveRecentImpostors(names: string[]) {
+  const cleanNames = uniqueCleanNames(names);
+  await AsyncStorage.setItem(RECENT_IMPOSTORS_KEY, JSON.stringify(cleanNames));
+  return cleanNames;
 }

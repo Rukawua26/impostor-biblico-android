@@ -13,14 +13,17 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Svg, { Circle, Line, Path, Polygon, Rect } from 'react-native-svg';
 import { bibleCategories, getEntriesForCategory } from './src/data/bibleDeck';
 import { IntroScreen } from './src/components/IntroScreen';
 import { defaultPlayers } from './src/data/defaultPlayers';
 import { createRound, normalizePlayers } from './src/game/createRound';
 import {
   loadFrequentPlayers,
+  loadRecentImpostors,
   loadUsedWords,
   saveFrequentPlayers,
+  saveRecentImpostors,
   saveUsedWords,
 } from './src/storage/gameStorage';
 import type { GameResult, GameSettings, Phase, Player, Round } from './src/types/game';
@@ -33,6 +36,75 @@ const defaultSettings: GameSettings = {
   categoryId: 'historias',
 };
 
+type CategoryIconProps = {
+  categoryId: string;
+  active: boolean;
+};
+
+function CategoryIcon({ categoryId, active }: CategoryIconProps) {
+  const stroke = active ? '#37e895' : '#9788f7';
+  const accent = active ? '#006eff' : '#2D3D89';
+
+  if (categoryId === 'historias') {
+    return (
+      <Svg width={46} height={46} viewBox="0 0 64 64">
+        <Path d="M14 14h18c5 0 9 4 9 9v27H23c-5 0-9-4-9-9V14Z" fill="none" stroke={stroke} strokeWidth={4} strokeLinejoin="round" />
+        <Path d="M41 23c0-5 4-9 9-9h4v36h-4c-5 0-9-4-9-9" fill="none" stroke={stroke} strokeWidth={4} strokeLinejoin="round" />
+        <Line x1={22} y1={26} x2={33} y2={26} stroke={accent} strokeWidth={4} strokeLinecap="round" />
+        <Line x1={22} y1={36} x2={33} y2={36} stroke={accent} strokeWidth={4} strokeLinecap="round" />
+      </Svg>
+    );
+  }
+
+  if (categoryId === 'personajes') {
+    return (
+      <Svg width={46} height={46} viewBox="0 0 64 64">
+        <Circle cx={32} cy={20} r={10} fill="none" stroke={stroke} strokeWidth={4} />
+        <Path d="M14 54c3-13 12-20 18-20s15 7 18 20" fill="none" stroke={stroke} strokeWidth={4} strokeLinecap="round" />
+        <Path d="M25 43h14" stroke={accent} strokeWidth={4} strokeLinecap="round" />
+      </Svg>
+    );
+  }
+
+  if (categoryId === 'lugares') {
+    return (
+      <Svg width={46} height={46} viewBox="0 0 64 64">
+        <Path d="M32 56s17-17 17-32a17 17 0 0 0-34 0c0 15 17 32 17 32Z" fill="none" stroke={stroke} strokeWidth={4} strokeLinejoin="round" />
+        <Circle cx={32} cy={24} r={7} fill="none" stroke={accent} strokeWidth={4} />
+      </Svg>
+    );
+  }
+
+  if (categoryId === 'objetos') {
+    return (
+      <Svg width={46} height={46} viewBox="0 0 64 64">
+        <Path d="M22 50h20" stroke={stroke} strokeWidth={4} strokeLinecap="round" />
+        <Path d="M28 50V30c0-7 8-7 8 0v20" fill="none" stroke={stroke} strokeWidth={4} strokeLinecap="round" />
+        <Path d="M20 30h24l-5-12H25l-5 12Z" fill="none" stroke={stroke} strokeWidth={4} strokeLinejoin="round" />
+        <Circle cx={32} cy={18} r={4} fill={accent} />
+      </Svg>
+    );
+  }
+
+  if (categoryId === 'profecias') {
+    return (
+      <Svg width={46} height={46} viewBox="0 0 64 64">
+        <Polygon points="32,8 37,25 54,25 40,35 45,52 32,42 19,52 24,35 10,25 27,25" fill="none" stroke={stroke} strokeWidth={4} strokeLinejoin="round" />
+        <Line x1={32} y1={19} x2={32} y2={36} stroke={accent} strokeWidth={4} strokeLinecap="round" />
+      </Svg>
+    );
+  }
+
+  return (
+    <Svg width={46} height={46} viewBox="0 0 64 64">
+      <Rect x={12} y={12} width={16} height={16} rx={4} fill="none" stroke={stroke} strokeWidth={4} />
+      <Rect x={36} y={12} width={16} height={16} rx={4} fill="none" stroke={accent} strokeWidth={4} />
+      <Rect x={12} y={36} width={16} height={16} rx={4} fill="none" stroke={accent} strokeWidth={4} />
+      <Rect x={36} y={36} width={16} height={16} rx={4} fill="none" stroke={stroke} strokeWidth={4} />
+    </Svg>
+  );
+}
+
 export default function App() {
   const [showIntro, setShowIntro] = useState(true);
   const [phase, setPhase] = useState<Phase>('setup');
@@ -40,6 +112,7 @@ export default function App() {
   const [frequentPlayers, setFrequentPlayers] = useState<string[]>(defaultPlayers.map((player) => player.name));
   const [newFrequentPlayerName, setNewFrequentPlayerName] = useState('');
   const [usedWords, setUsedWords] = useState<string[]>([]);
+  const [recentImpostors, setRecentImpostors] = useState<string[]>([]);
   const [activePlayers, setActivePlayers] = useState<Player[]>([]);
   const [settings, setSettings] = useState<GameSettings>(defaultSettings);
   const [round, setRound] = useState<Round | null>(null);
@@ -55,6 +128,7 @@ export default function App() {
   const [gameResult, setGameResult] = useState<GameResult>(null);
   const [eliminatedPlayerName, setEliminatedPlayerName] = useState('');
   const curtainTranslateY = useRef(new Animated.Value(0)).current;
+  const firstSpeakerPulse = useRef(new Animated.Value(0)).current;
 
   const impostorPlayers = activePlayers.filter((player) => round?.impostorIds.includes(player.id));
   const currentPlayer = activePlayers[revealIndex];
@@ -84,6 +158,7 @@ export default function App() {
     (id) => activePlayers.some((player) => player.id === id) && !visibleEliminatedIds.includes(id),
   ) ?? [];
   const selectedWasImpostor = !!selectedVoteId && !!round?.impostorIds.includes(selectedVoteId);
+  const currentPlayerIsImpostor = !!currentPlayer && !!round?.impostorIds.includes(currentPlayer.id);
   function resetCurtain() {
     setCurtainLifted(false);
     curtainTranslateY.setValue(0);
@@ -118,9 +193,10 @@ export default function App() {
     let isMounted = true;
 
     async function loadSavedData() {
-      const [savedPlayers, savedUsedWords] = await Promise.all([
+      const [savedPlayers, savedUsedWords, savedRecentImpostors] = await Promise.all([
         loadFrequentPlayers(),
         loadUsedWords(),
+        loadRecentImpostors(),
       ]);
 
       if (!isMounted) return;
@@ -134,6 +210,7 @@ export default function App() {
       }
 
       setUsedWords(savedUsedWords);
+      setRecentImpostors(savedRecentImpostors);
     }
 
     loadSavedData();
@@ -142,6 +219,32 @@ export default function App() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (phase !== 'discussion' || !firstSpeaker) {
+      firstSpeakerPulse.stopAnimation();
+      firstSpeakerPulse.setValue(0);
+      return;
+    }
+
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(firstSpeakerPulse, {
+          toValue: 1,
+          duration: 850,
+          useNativeDriver: true,
+        }),
+        Animated.timing(firstSpeakerPulse, {
+          toValue: 0,
+          duration: 850,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    animation.start();
+    return () => animation.stop();
+  }, [firstSpeaker, firstSpeakerPulse, phase]);
 
   useEffect(() => {
     if (phase !== 'discussion' || discussionTimeLeft <= 0) return;
@@ -247,10 +350,15 @@ export default function App() {
       settings.impostorCount,
       settings.categoryId,
       hasAvailableWord ? usedWords : [],
+      recentImpostors,
     );
+    const nextImpostorNames = players
+      .filter((player) => nextRound.impostorIds.includes(player.id))
+      .map((player) => player.name);
     const nextUsedWords = await saveUsedWords(
       hasAvailableWord ? [...usedWords, nextRound.word] : [nextRound.word],
     );
+    const nextRecentImpostors = await saveRecentImpostors(nextImpostorNames);
     const nextFrequentPlayers = await saveFrequentPlayers([
       ...frequentPlayers,
       ...players.map((player) => player.name),
@@ -258,6 +366,7 @@ export default function App() {
 
     setFrequentPlayers(nextFrequentPlayers);
     setUsedWords(nextUsedWords);
+    setRecentImpostors(nextRecentImpostors);
     setAllPlayers(players);
     setActivePlayers(players);
     setRound(nextRound);
@@ -389,11 +498,13 @@ export default function App() {
     >
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.hero}>
+        <View style={[styles.hero, phase === 'reveal' && styles.heroCompact]}>
           <Text style={styles.kicker}>Juego presencial multijugador</Text>
-          <Text style={styles.title}>El Impostor Biblico</Text>
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-          <View style={styles.heroLine} />
+          <Text style={[styles.title, phase === 'reveal' && styles.titleCompact]}>
+            El Impostor Biblico
+          </Text>
+          {subtitle && phase !== 'reveal' ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+          {phase !== 'reveal' ? <View style={styles.heroLine} /> : null}
         </View>
 
         {phase === 'setup' && (
@@ -488,6 +599,10 @@ export default function App() {
                     ]}
                     onPress={() => setSettings((prev) => ({ ...prev, categoryId: category.id }))}
                   >
+                    <CategoryIcon
+                      categoryId={category.id}
+                      active={settings.categoryId === category.id}
+                    />
                     <Text style={styles.categoryButtonText}>{category.name}</Text>
                   </Pressable>
                 ))}
@@ -615,7 +730,14 @@ export default function App() {
               Solo esta persona debe mirar la pantalla. El rol esta cubierto por
               un telon para evitar toques accidentales.
             </Text>
-            <View style={styles.roleCard}>
+            <View
+              style={[
+                styles.roleCard,
+                cardVisible && curtainLifted && (
+                  currentPlayerIsImpostor ? styles.roleCardImpostor : styles.roleCardCivil
+                ),
+              ]}
+            >
               {cardVisible ? (
                 round?.impostorIds.includes(currentPlayer.id) ? (
                   <>
@@ -626,7 +748,7 @@ export default function App() {
                     </Text>
                     <View style={styles.phraseCard}>
                       <Text style={styles.phraseLabel}>
-                        Frase para comenzar:
+                        Pista:
                       </Text>
                       <Text style={styles.phraseText}>
                         {round?.impostorClue}
@@ -701,11 +823,29 @@ export default function App() {
               Cada jugador da una pista breve. Los impostores deben fingir.
             </Text>
             {firstSpeaker ? (
-              <View style={styles.firstSpeakerCard}>
+              <Animated.View
+                style={[
+                  styles.firstSpeakerCard,
+                  {
+                    opacity: firstSpeakerPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.88, 1],
+                    }),
+                    transform: [
+                      {
+                        scale: firstSpeakerPulse.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [1, 1.035],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
                 <Text style={styles.firstSpeakerLabel}>Empieza</Text>
                 <Text style={styles.firstSpeakerName}>{firstSpeaker.name}</Text>
                 <Text style={styles.firstSpeakerHint}>Luego sigan en sentido horario.</Text>
-              </View>
+              </Animated.View>
             ) : null}
             <Text style={styles.helperText}>
               Tiempo restante de discusion. Pueden avanzar antes si todos estan
@@ -884,6 +1024,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     padding: 22,
   },
+  heroCompact: {
+    borderRadius: 22,
+    marginBottom: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
   kicker: {
     color: '#37e895',
     fontSize: 13,
@@ -898,6 +1044,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.8,
     lineHeight: 42,
     marginTop: 10,
+  },
+  titleCompact: {
+    fontSize: 22,
+    lineHeight: 26,
+    marginTop: 4,
   },
   subtitle: {
     color: '#9788f7',
@@ -1052,10 +1203,26 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1,
     justifyContent: 'center',
-    minHeight: 220,
+    minHeight: 310,
     overflow: 'hidden',
     padding: 20,
     position: 'relative',
+  },
+  roleCardCivil: {
+    backgroundColor: '#08201F',
+    borderColor: '#37e895',
+    borderWidth: 2,
+    shadowColor: '#37e895',
+    shadowOpacity: 0.26,
+    shadowRadius: 18,
+  },
+  roleCardImpostor: {
+    backgroundColor: '#250C16',
+    borderColor: '#ff4a48',
+    borderWidth: 2,
+    shadowColor: '#ff4a48',
+    shadowOpacity: 0.24,
+    shadowRadius: 18,
   },
   roleLabel: {
     color: '#9788f7',
@@ -1128,14 +1295,14 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   curtainCharacter: {
-    height: 112,
-    marginBottom: 12,
+    height: 104,
+    marginBottom: 10,
     resizeMode: 'contain',
-    width: 112,
+    width: 104,
   },
   curtainTitle: {
     color: '#FFFFFF',
-    fontSize: 24,
+    fontSize: 23,
     fontWeight: '900',
     marginBottom: 6,
   },
@@ -1175,16 +1342,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'center',
     backgroundColor: '#081333',
-    borderColor: '#37e895',
+    borderColor: '#006eff',
     borderRadius: 26,
     borderWidth: 2,
     marginBottom: 16,
-    minWidth: '58%',
+    minWidth: '68%',
     paddingHorizontal: 22,
     paddingVertical: 20,
-    shadowColor: '#37e895',
-    shadowOpacity: 0.28,
-    shadowRadius: 20,
+    shadowColor: '#006eff',
+    shadowOpacity: 0.38,
+    shadowRadius: 24,
   },
   firstSpeakerLabel: {
     color: '#9788f7',
@@ -1195,10 +1362,10 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   firstSpeakerName: {
-    color: '#37e895',
-    fontSize: 34,
+    color: '#FFFFFF',
+    fontSize: 42,
     fontWeight: '900',
-    lineHeight: 40,
+    lineHeight: 48,
     textAlign: 'center',
   },
   firstSpeakerHint: {
@@ -1270,12 +1437,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   categoryButton: {
+    alignItems: 'center',
     backgroundColor: '#050B1E',
     borderColor: '#2D3D89',
     borderRadius: 14,
     borderWidth: 1,
+    gap: 8,
+    minWidth: '30%',
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 14,
   },
   categoryButtonSelected: {
     backgroundColor: '#1A2460',
@@ -1285,6 +1455,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
+    textAlign: 'center',
   },
   roundBadge: {
     alignSelf: 'flex-start',
