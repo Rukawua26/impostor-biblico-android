@@ -17,7 +17,7 @@ import Svg, { Circle, Line, Path, Polygon, Rect } from 'react-native-svg';
 import { bibleCategories, getEntriesForCategory } from './src/data/bibleDeck';
 import { IntroScreen } from './src/components/IntroScreen';
 import { defaultPlayers } from './src/data/defaultPlayers';
-import { createRound, normalizePlayers } from './src/game/createRound';
+import { createRound, normalizePlayers, pickNextFirstSpeaker } from './src/game/createRound';
 import {
   loadFrequentPlayers,
   loadRecentImpostors,
@@ -31,7 +31,7 @@ import type { GameResult, GameSettings, Phase, Player, Round } from './src/types
 const defaultSettings: GameSettings = {
   discussionMinutes: 0,
   voteMinutes: 0,
-  maxRounds: 5,
+  maxRounds: 20,
   impostorCount: 1,
   categoryId: 'historias',
 };
@@ -42,8 +42,8 @@ type CategoryIconProps = {
 };
 
 function CategoryIcon({ categoryId, active }: CategoryIconProps) {
-  const stroke = active ? '#37e895' : '#9788f7';
-  const accent = active ? '#006eff' : '#2D3D89';
+  const stroke = active ? '#B4FF1F' : '#FFDA1F';
+  const accent = active ? '#2222FC' : '#ED315A';
 
   if (categoryId === 'historias') {
     return (
@@ -119,12 +119,13 @@ export default function App() {
   const [revealIndex, setRevealIndex] = useState(0);
   const [cardVisible, setCardVisible] = useState(false);
   const [curtainLifted, setCurtainLifted] = useState(false);
-  const [selectedVoteId, setSelectedVoteId] = useState<number | null>(null);
+  const [selectedVoteIds, setSelectedVoteIds] = useState<number[]>([]);
   const [discussionTimeLeft, setDiscussionTimeLeft] = useState(0);
   const [voteTimeLeft, setVoteTimeLeft] = useState(0);
   const [setupMessage, setSetupMessage] = useState('');
   const [roundNumber, setRoundNumber] = useState(1);
   const [eliminatedIds, setEliminatedIds] = useState<number[]>([]);
+  const [roundStarterIds, setRoundStarterIds] = useState<number[]>([]);
   const [gameResult, setGameResult] = useState<GameResult>(null);
   const [eliminatedPlayerName, setEliminatedPlayerName] = useState('');
   const curtainTranslateY = useRef(new Animated.Value(0)).current;
@@ -132,7 +133,7 @@ export default function App() {
 
   const impostorPlayers = activePlayers.filter((player) => round?.impostorIds.includes(player.id));
   const currentPlayer = activePlayers[revealIndex];
-  const selectedPlayer = activePlayers.find((player) => player.id === selectedVoteId);
+  const selectedPlayers = activePlayers.filter((player) => selectedVoteIds.includes(player.id));
   const firstSpeaker = activePlayers.find((player) => player.id === round?.firstSpeakerId);
   const normalizedAll = useMemo(() => normalizePlayers(allPlayers), [allPlayers]);
   const canStart =
@@ -140,14 +141,15 @@ export default function App() {
     settings.discussionMinutes > 0 &&
     settings.voteMinutes > 0 &&
     settings.impostorCount > 0 &&
+    settings.impostorCount <= 5 &&
     settings.impostorCount < normalizedAll.length;
   const visibleEliminatedIds = useMemo(() => {
-    if (selectedVoteId) {
-      return [...new Set([...eliminatedIds, selectedVoteId])];
+    if (selectedVoteIds.length > 0) {
+      return [...new Set([...eliminatedIds, ...selectedVoteIds])];
     }
 
     return eliminatedIds;
-  }, [eliminatedIds, selectedVoteId]);
+  }, [eliminatedIds, selectedVoteIds]);
   const visibleEliminatedPlayers = allPlayers.filter((player) =>
     visibleEliminatedIds.includes(player.id),
   );
@@ -157,7 +159,9 @@ export default function App() {
   const activeImpostorIds = round?.impostorIds.filter(
     (id) => activePlayers.some((player) => player.id === id) && !visibleEliminatedIds.includes(id),
   ) ?? [];
-  const selectedWasImpostor = !!selectedVoteId && !!round?.impostorIds.includes(selectedVoteId);
+  const selectedImpostorCount = selectedVoteIds.filter((id) => round?.impostorIds.includes(id)).length;
+  const selectedWasOnlyImpostors = selectedVoteIds.length > 0 && selectedImpostorCount === selectedVoteIds.length;
+  const selectedHadNoImpostors = selectedVoteIds.length > 0 && selectedImpostorCount === 0;
   const currentPlayerIsImpostor = !!currentPlayer && !!round?.impostorIds.includes(currentPlayer.id);
   function resetCurtain() {
     setCurtainLifted(false);
@@ -337,8 +341,8 @@ export default function App() {
       return;
     }
 
-    if (settings.impostorCount <= 0 || settings.impostorCount >= players.length) {
-      setSetupMessage('La cantidad de impostores debe ser menor que la cantidad de jugadores.');
+    if (settings.impostorCount <= 0 || settings.impostorCount > 5 || settings.impostorCount >= players.length) {
+      setSetupMessage('La cantidad de impostores debe ser de 1 a 5 y menor que la cantidad de jugadores.');
       return;
     }
 
@@ -351,6 +355,7 @@ export default function App() {
       settings.categoryId,
       hasAvailableWord ? usedWords : [],
       recentImpostors,
+      [],
     );
     const nextImpostorNames = players
       .filter((player) => nextRound.impostorIds.includes(player.id))
@@ -373,10 +378,11 @@ export default function App() {
     setRevealIndex(0);
     setCardVisible(false);
     resetCurtain();
-    setSelectedVoteId(null);
+    setSelectedVoteIds([]);
     setDiscussionTimeLeft(settings.discussionMinutes * 60);
     setVoteTimeLeft(settings.voteMinutes * 60);
     setRoundNumber(1);
+    setRoundStarterIds([nextRound.firstSpeakerId]);
     setEliminatedIds([]);
     setGameResult(null);
     setEliminatedPlayerName('');
@@ -411,23 +417,35 @@ export default function App() {
 
   function goToVote() {
     setVoteTimeLeft(settings.voteMinutes * 60);
-    setSelectedVoteId(null);
+    setSelectedVoteIds([]);
     setPhase('vote');
   }
 
-  function handleVoteResult(eliminatedId: number) {
-    setSelectedVoteId(eliminatedId);
+  function toggleVoteSelection(playerId: number) {
+    setSelectedVoteIds((current) => {
+      if (current.includes(playerId)) {
+        return current.filter((id) => id !== playerId);
+      }
 
-    const remainingImpostorIds = activeImpostorIds.filter((id) => id !== eliminatedId);
+      if (current.length >= settings.impostorCount) return current;
 
-    if (round?.impostorIds.includes(eliminatedId) && remainingImpostorIds.length === 0) {
+      return [...current, playerId];
+    });
+  }
+
+  function handleVoteResult() {
+    if (selectedVoteIds.length === 0) return;
+
+    const selectedIdSet = new Set(selectedVoteIds);
+    const remainingImpostorIds = activeImpostorIds.filter((id) => !selectedIdSet.has(id));
+    const eliminated = activePlayers.filter((player) => selectedIdSet.has(player.id));
+    setEliminatedPlayerName(eliminated.map((player) => player.name).join(', '));
+
+    if (remainingImpostorIds.length === 0) {
       setGameResult('innocents');
       setPhase('result');
       return;
     }
-
-    const eliminated = activePlayers.find((player) => player.id === eliminatedId);
-    setEliminatedPlayerName(eliminated?.name ?? '');
 
     if (roundNumber >= settings.maxRounds) {
       setGameResult('impostor');
@@ -439,7 +457,8 @@ export default function App() {
   }
 
   function nextRound() {
-    const remaining = activePlayers.filter((player) => player.id !== selectedVoteId);
+    const selectedIdSet = new Set(selectedVoteIds);
+    const remaining = activePlayers.filter((player) => !selectedIdSet.has(player.id));
 
     const remainingImpostors = round?.impostorIds.filter((id) =>
       remaining.some((player) => player.id === id),
@@ -453,14 +472,25 @@ export default function App() {
 
     setEliminatedIds((current) => [
       ...current,
-      ...(selectedVoteId ? [selectedVoteId] : []),
+      ...selectedVoteIds,
     ]);
+    const nextFirstSpeakerId = pickNextFirstSpeaker(remaining, roundStarterIds);
+    const usedActiveStarters = roundStarterIds.filter((id) =>
+      remaining.some((player) => player.id === id),
+    );
+
     setActivePlayers(remaining);
     setRoundNumber((current) => current + 1);
+    setRound((current) => current ? { ...current, firstSpeakerId: nextFirstSpeakerId } : current);
+    setRoundStarterIds(
+      usedActiveStarters.includes(nextFirstSpeakerId)
+        ? [nextFirstSpeakerId]
+        : [...usedActiveStarters, nextFirstSpeakerId],
+    );
     setDiscussionTimeLeft(settings.discussionMinutes * 60);
     setCardVisible(false);
     resetCurtain();
-    setSelectedVoteId(null);
+    setSelectedVoteIds([]);
     setPhase('discussion');
   }
 
@@ -470,10 +500,11 @@ export default function App() {
     setRevealIndex(0);
     setCardVisible(false);
     resetCurtain();
-    setSelectedVoteId(null);
+    setSelectedVoteIds([]);
     setRound(null);
     setSetupMessage('');
     setRoundNumber(1);
+    setRoundStarterIds([]);
     setEliminatedIds([]);
     setGameResult(null);
     setEliminatedPlayerName('');
@@ -549,7 +580,7 @@ export default function App() {
                   style={styles.input}
                   value={newFrequentPlayerName}
                   placeholder="Nombre nuevo"
-                  placeholderTextColor="#9788f7"
+                  placeholderTextColor="#FFDA1F"
                   returnKeyType="done"
                   onChangeText={setNewFrequentPlayerName}
                   onSubmitEditing={addFrequentPlayer}
@@ -566,7 +597,7 @@ export default function App() {
                     style={styles.input}
                     value={player.name}
                     placeholder={`Jugador ${index + 1}`}
-                    placeholderTextColor="#9788f7"
+                    placeholderTextColor="#FFDA1F"
                     returnKeyType="done"
                     onChangeText={(name) => updatePlayerName(player.id, name)}
                   />
@@ -614,14 +645,14 @@ export default function App() {
                 value={String(settings.impostorCount)}
                 onChangeText={(text) => {
                   const num = parseInt(text || '0', 10);
-                  if (!isNaN(num) && num >= 0) {
+                  if (!isNaN(num) && num >= 0 && num <= 5) {
                     setSettings((prev) => ({ ...prev, impostorCount: num }));
                   }
                 }}
                 keyboardType="number-pad"
                 returnKeyType="done"
                 placeholder="1"
-                placeholderTextColor="#9788f7"
+                placeholderTextColor="#FFDA1F"
               />
 
               <Text style={styles.settingLabel}>Tiempo de discusion (minutos)</Text>
@@ -637,7 +668,7 @@ export default function App() {
                 keyboardType="number-pad"
                 returnKeyType="done"
                 placeholder="0"
-                placeholderTextColor="#9788f7"
+                placeholderTextColor="#FFDA1F"
               />
 
               <Text style={styles.settingLabel}>Tiempo de votacion (minutos)</Text>
@@ -653,7 +684,7 @@ export default function App() {
                 keyboardType="number-pad"
                 returnKeyType="done"
                 placeholder="0"
-                placeholderTextColor="#9788f7"
+                placeholderTextColor="#FFDA1F"
               />
 
               <Text style={styles.settingLabel}>Rondas maximas</Text>
@@ -662,14 +693,14 @@ export default function App() {
                 value={String(settings.maxRounds)}
                 onChangeText={(text) => {
                   const num = parseInt(text, 10);
-                  if (!isNaN(num) && num >= 1 && num <= 10) {
+                  if (!isNaN(num) && num >= 1 && num <= 20) {
                     setSettings((prev) => ({ ...prev, maxRounds: num }));
                   }
                 }}
                 keyboardType="number-pad"
                 returnKeyType="done"
-                placeholder="5"
-                placeholderTextColor="#9788f7"
+                placeholder="20"
+                placeholderTextColor="#FFDA1F"
               />
 
               <Pressable
@@ -751,7 +782,7 @@ export default function App() {
                         Pista:
                       </Text>
                       <Text style={styles.phraseText}>
-                        {round?.impostorClue}
+                        {round?.impostorCluesById[currentPlayer.id] ?? round?.impostorClue}
                       </Text>
                     </View>
                   </>
@@ -877,7 +908,10 @@ export default function App() {
             <Text style={styles.timerText}>{formatTime(voteTimeLeft)}</Text>
             <Text style={styles.helperText}>
               Todos votan levantando la mano. El facilitador marca al jugador que
-              el grupo decidio eliminar.
+              el grupo decidio eliminar. Puedes escoger hasta {settings.impostorCount}.
+            </Text>
+            <Text style={styles.selectionCountText}>
+              Seleccionados {selectedVoteIds.length} de {settings.impostorCount} posibles
             </Text>
             {activePlayers.map((player) => {
               return (
@@ -885,25 +919,27 @@ export default function App() {
                   key={player.id}
                   style={[
                     styles.voteButton,
-                    selectedVoteId === player.id && styles.voteButtonSelected,
+                    selectedVoteIds.includes(player.id) && styles.voteButtonSelected,
                   ]}
-                  onPress={() => setSelectedVoteId(player.id)}
+                  onPress={() => toggleVoteSelection(player.id)}
                 >
                   <Text style={styles.voteButtonText}>{player.name}</Text>
                 </Pressable>
               );
             })}
-            {selectedPlayer ? (
+            {selectedPlayers.length > 0 ? (
               <Text style={styles.warningText}>
-                Confirmar eliminado: {selectedPlayer.name}
+                Confirmar: {selectedPlayers.map((player) => player.name).join(', ')}
               </Text>
             ) : null}
             <Pressable
-              style={[styles.primaryButton, !selectedVoteId && styles.disabledButton]}
-              disabled={!selectedVoteId}
-              onPress={() => selectedVoteId && handleVoteResult(selectedVoteId)}
+              style={[styles.primaryButton, selectedVoteIds.length === 0 && styles.disabledButton]}
+              disabled={selectedVoteIds.length === 0}
+              onPress={handleVoteResult}
             >
-              <Text style={styles.primaryButtonText}>Confirmar eliminado</Text>
+              <Text style={styles.primaryButtonText}>
+                {selectedVoteIds.length > 1 ? 'Confirmar eliminados' : 'Confirmar eliminado'}
+              </Text>
             </Pressable>
             <Pressable style={styles.secondaryButton} onPress={startGame}>
               <Text style={styles.secondaryButtonText}>Nueva partida</Text>
@@ -917,15 +953,25 @@ export default function App() {
         {phase === 'eliminated' && (
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>
-              {eliminatedPlayerName} fue eliminado
+              {eliminatedPlayerName} {selectedVoteIds.length > 1 ? 'fueron eliminados' : 'fue eliminado'}
             </Text>
-            <Text style={selectedWasImpostor ? styles.successMessageText : styles.dangerMessageText}>
-              {selectedWasImpostor
-                ? 'Era impostor, pero todavia queda otro impostor en la partida.'
-                : 'No era impostor. El juego continua.'}
+            <Text
+              style={
+                selectedWasOnlyImpostors
+                  ? styles.successMessageText
+                  : selectedHadNoImpostors
+                    ? styles.dangerMessageText
+                    : styles.mixedMessageText
+              }
+            >
+              {selectedWasOnlyImpostors
+                ? 'Buena votacion: solo eliminaron impostores, pero todavia queda alguno.'
+                : selectedHadNoImpostors
+                  ? 'No eliminaron ningun impostor. El juego continua.'
+                  : 'Votacion mezclada: eliminaron impostor e inocente.'}
             </Text>
             <Text style={styles.bodyText}>
-              Quedan {activePlayers.length - 1} jugadores en la partida.
+              Quedan {activePlayers.length - selectedVoteIds.length} jugadores en la partida.
             </Text>
             <Text style={styles.helperText}>
               La palabra no se vuelve a mostrar. Los jugadores deben recordarla.
@@ -960,9 +1006,9 @@ export default function App() {
             <Text style={styles.bodyText}>
               Impostores: {impostorPlayers.map((player) => player.name).join(', ')}
             </Text>
-            {selectedVoteId ? (
+            {selectedVoteIds.length > 0 ? (
               <Text style={styles.bodyText}>
-                Ultimo eliminado: {selectedPlayer?.name}
+                Ultimos eliminados: {selectedPlayers.map((player) => player.name).join(', ')}
               </Text>
             ) : null}
             {visibleEliminatedPlayers.length > 0 && (
@@ -977,8 +1023,10 @@ export default function App() {
               Historia: {round?.word}
             </Text>
             <View style={styles.listCard}>
-              <Text style={styles.listTitle}>Pista usada</Text>
-              <Text style={styles.listText}>{round?.impostorClue}</Text>
+              <Text style={styles.listTitle}>Pistas usadas</Text>
+              <Text style={styles.listText}>
+                {[...new Set(Object.values(round?.impostorCluesById ?? {}))].join(', ')}
+              </Text>
             </View>
             <View style={styles.listCard}>
               <Text style={styles.listTitle}>Referencias biblicas</Text>
@@ -1008,7 +1056,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#050B1E',
+    backgroundColor: '#9B2EEF',
   },
   content: {
     flexGrow: 1,
@@ -1016,8 +1064,8 @@ const styles = StyleSheet.create({
     paddingTop: 64,
   },
   hero: {
-    backgroundColor: '#081333',
-    borderColor: '#263D8F',
+    backgroundColor: '#B41FFF',
+    borderColor: '#ED315A',
     borderRadius: 34,
     borderWidth: 1,
     marginBottom: 18,
@@ -1031,7 +1079,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   kicker: {
-    color: '#37e895',
+    color: '#B4FF1F',
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 1.5,
@@ -1051,21 +1099,21 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   subtitle: {
-    color: '#9788f7',
+    color: '#FFDA1F',
     fontSize: 17,
     lineHeight: 24,
     marginTop: 12,
   },
   heroLine: {
-    backgroundColor: '#006eff',
+    backgroundColor: '#2222FC',
     borderRadius: 999,
     height: 4,
     marginTop: 18,
     width: 92,
   },
   card: {
-    backgroundColor: '#0B1638',
-    borderColor: '#2D3D89',
+    backgroundColor: '#B41FFF',
+    borderColor: '#ED315A',
     borderRadius: 32,
     borderWidth: 1,
     marginBottom: 14,
@@ -1084,8 +1132,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   input: {
-    backgroundColor: '#050B1E',
-    borderColor: '#2D3D89',
+    backgroundColor: '#9B2EEF',
+    borderColor: '#ED315A',
     borderRadius: 16,
     borderWidth: 1,
     color: '#FFFFFF',
@@ -1096,7 +1144,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#006eff',
+    backgroundColor: '#2222FC',
     borderRadius: 20,
     marginTop: 16,
     paddingVertical: 15,
@@ -1108,15 +1156,15 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#081333',
-    borderColor: '#2D3D89',
+    backgroundColor: '#B41FFF',
+    borderColor: '#ED315A',
     borderRadius: 20,
     borderWidth: 1,
     marginTop: 8,
     paddingVertical: 14,
   },
   secondaryButtonText: {
-    color: '#37e895',
+    color: '#B4FF1F',
     fontSize: 16,
     fontWeight: '800',
   },
@@ -1125,7 +1173,7 @@ const styles = StyleSheet.create({
   },
   smallButton: {
     alignItems: 'center',
-    backgroundColor: '#ff4a48',
+    backgroundColor: '#ED315A',
     borderRadius: 14,
     justifyContent: 'center',
     minWidth: 44,
@@ -1133,7 +1181,7 @@ const styles = StyleSheet.create({
   },
   addButton: {
     alignItems: 'center',
-    backgroundColor: '#37e895',
+    backgroundColor: '#B4FF1F',
     borderRadius: 14,
     justifyContent: 'center',
     minWidth: 44,
@@ -1153,8 +1201,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   frequentNameButton: {
-    backgroundColor: '#050B1E',
-    borderColor: '#2D3D89',
+    backgroundColor: '#9B2EEF',
+    borderColor: '#ED315A',
     borderRadius: 16,
     borderWidth: 1,
     flex: 1,
@@ -1162,8 +1210,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   frequentNameButtonSelected: {
-    backgroundColor: '#1A2460',
-    borderColor: '#37e895',
+    backgroundColor: '#2222FC',
+    borderColor: '#B4FF1F',
   },
   frequentNameText: {
     color: '#FFFFFF',
@@ -1171,26 +1219,40 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   helperText: {
-    color: '#9788f7',
+    color: '#FFDA1F',
     fontSize: 15,
     lineHeight: 21,
     marginBottom: 16,
   },
   warningText: {
-    color: '#ff4a48',
+    color: '#ED315A',
     fontSize: 15,
     fontWeight: '800',
     marginTop: 12,
   },
+  selectionCountText: {
+    color: '#FFDA1F',
+    fontSize: 15,
+    fontWeight: '900',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
   successMessageText: {
-    color: '#37e895',
+    color: '#B4FF1F',
     fontSize: 20,
     fontWeight: '900',
     lineHeight: 28,
     marginBottom: 12,
   },
   dangerMessageText: {
-    color: '#ff4a48',
+    color: '#ED315A',
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 28,
+    marginBottom: 12,
+  },
+  mixedMessageText: {
+    color: '#FFDA1F',
     fontSize: 20,
     fontWeight: '900',
     lineHeight: 28,
@@ -1198,8 +1260,8 @@ const styles = StyleSheet.create({
   },
   roleCard: {
     alignItems: 'center',
-    backgroundColor: '#050B1E',
-    borderColor: '#2D3D89',
+    backgroundColor: '#9B2EEF',
+    borderColor: '#ED315A',
     borderRadius: 22,
     borderWidth: 1,
     justifyContent: 'center',
@@ -1209,23 +1271,23 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   roleCardCivil: {
-    backgroundColor: '#08201F',
-    borderColor: '#37e895',
+    backgroundColor: '#4B7A2A',
+    borderColor: '#B4FF1F',
     borderWidth: 2,
-    shadowColor: '#37e895',
+    shadowColor: '#B4FF1F',
     shadowOpacity: 0.26,
     shadowRadius: 18,
   },
   roleCardImpostor: {
-    backgroundColor: '#250C16',
-    borderColor: '#ff4a48',
+    backgroundColor: '#6D1740',
+    borderColor: '#ED315A',
     borderWidth: 2,
-    shadowColor: '#ff4a48',
+    shadowColor: '#ED315A',
     shadowOpacity: 0.24,
     shadowRadius: 18,
   },
   roleLabel: {
-    color: '#9788f7',
+    color: '#FFDA1F',
     fontSize: 14,
     fontWeight: '800',
     letterSpacing: 1,
@@ -1239,7 +1301,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   impostorText: {
-    color: '#ff4a48',
+    color: '#ED315A',
     fontSize: 42,
     fontWeight: '900',
     textAlign: 'center',
@@ -1251,15 +1313,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   roleHint: {
-    color: '#C8C1FF',
+    color: '#FFFFFF',
     fontSize: 16,
     lineHeight: 23,
     marginTop: 16,
     textAlign: 'center',
   },
   phraseCard: {
-    backgroundColor: '#1A2460',
-    borderColor: '#9788f7',
+    backgroundColor: '#2222FC',
+    borderColor: '#FFDA1F',
     borderWidth: 1,
     borderRadius: 16,
     marginTop: 20,
@@ -1267,7 +1329,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   phraseLabel: {
-    color: '#37e895',
+    color: '#B4FF1F',
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.5,
@@ -1284,7 +1346,7 @@ const styles = StyleSheet.create({
   },
   curtain: {
     alignItems: 'center',
-    backgroundColor: '#006eff',
+    backgroundColor: '#2222FC',
     bottom: 0,
     justifyContent: 'center',
     left: 0,
@@ -1307,7 +1369,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   curtainText: {
-    color: '#DCD8FF',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
     lineHeight: 22,
@@ -1320,20 +1382,20 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   ruleText: {
-    color: '#DCD8FF',
+    color: '#FFFFFF',
     fontSize: 16,
     lineHeight: 24,
     marginBottom: 10,
   },
   timerText: {
-    color: '#37e895',
+    color: '#B4FF1F',
     fontSize: 54,
     fontWeight: '900',
     marginBottom: 12,
     textAlign: 'center',
   },
   bodyText: {
-    color: '#C8C1FF',
+    color: '#FFFFFF',
     fontSize: 17,
     lineHeight: 25,
     marginBottom: 10,
@@ -1341,20 +1403,20 @@ const styles = StyleSheet.create({
   firstSpeakerCard: {
     alignItems: 'center',
     alignSelf: 'center',
-    backgroundColor: '#081333',
-    borderColor: '#006eff',
+    backgroundColor: '#B41FFF',
+    borderColor: '#2222FC',
     borderRadius: 26,
     borderWidth: 2,
     marginBottom: 16,
     minWidth: '68%',
     paddingHorizontal: 22,
     paddingVertical: 20,
-    shadowColor: '#006eff',
+    shadowColor: '#2222FC',
     shadowOpacity: 0.38,
     shadowRadius: 24,
   },
   firstSpeakerLabel: {
-    color: '#9788f7',
+    color: '#FFDA1F',
     fontSize: 14,
     fontWeight: '900',
     letterSpacing: 1.4,
@@ -1369,7 +1431,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   firstSpeakerHint: {
-    color: '#DCD8FF',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
@@ -1377,23 +1439,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   listCard: {
-    backgroundColor: '#050B1E',
-    borderColor: '#2D3D89',
+    backgroundColor: '#9B2EEF',
+    borderColor: '#ED315A',
     borderRadius: 16,
     borderWidth: 1,
     marginBottom: 12,
     padding: 14,
   },
   listCardMuted: {
-    backgroundColor: '#081333',
-    borderColor: '#2D3D89',
+    backgroundColor: '#B41FFF',
+    borderColor: '#ED315A',
     borderRadius: 16,
     borderWidth: 1,
     marginBottom: 12,
     padding: 14,
   },
   listTitle: {
-    color: '#37e895',
+    color: '#B4FF1F',
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 0.5,
@@ -1401,22 +1463,22 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   listText: {
-    color: '#DCD8FF',
+    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
     lineHeight: 22,
   },
   voteButton: {
-    backgroundColor: '#050B1E',
-    borderColor: '#2D3D89',
+    backgroundColor: '#9B2EEF',
+    borderColor: '#ED315A',
     borderRadius: 16,
     borderWidth: 1,
     marginBottom: 10,
     padding: 15,
   },
   voteButtonSelected: {
-    backgroundColor: '#1A2460',
-    borderColor: '#37e895',
+    backgroundColor: '#2222FC',
+    borderColor: '#B4FF1F',
   },
   voteButtonText: {
     color: '#FFFFFF',
@@ -1424,7 +1486,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   settingLabel: {
-    color: '#DCD8FF',
+    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 8,
@@ -1438,8 +1500,8 @@ const styles = StyleSheet.create({
   },
   categoryButton: {
     alignItems: 'center',
-    backgroundColor: '#050B1E',
-    borderColor: '#2D3D89',
+    backgroundColor: '#9B2EEF',
+    borderColor: '#ED315A',
     borderRadius: 14,
     borderWidth: 1,
     gap: 8,
@@ -1448,8 +1510,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   categoryButtonSelected: {
-    backgroundColor: '#1A2460',
-    borderColor: '#37e895',
+    backgroundColor: '#2222FC',
+    borderColor: '#B4FF1F',
   },
   categoryButtonText: {
     color: '#FFFFFF',
@@ -1459,7 +1521,7 @@ const styles = StyleSheet.create({
   },
   roundBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#006eff',
+    backgroundColor: '#2222FC',
     borderRadius: 12,
     marginBottom: 12,
     paddingHorizontal: 14,

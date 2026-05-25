@@ -6,7 +6,7 @@ type IntroScreenProps = {
   onFinish: () => void;
 };
 
-const INTRO_DURATION = 5000;
+const INTRO_DURATION = 8000;
 
 export function IntroScreen({ onFinish }: IntroScreenProps) {
   const logoScale = useRef(new Animated.Value(0.82)).current;
@@ -48,7 +48,7 @@ export function IntroScreen({ onFinish }: IntroScreenProps) {
         duration: 500,
         useNativeDriver: true,
       }),
-      Animated.delay(2550),
+      Animated.delay(5550),
       Animated.timing(screenOpacity, {
         toValue: 0,
         duration: 520,
@@ -99,14 +99,14 @@ export function IntroScreen({ onFinish }: IntroScreenProps) {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    backgroundColor: '#050B1E',
+    backgroundColor: '#9B2EEF',
     flex: 1,
     justifyContent: 'center',
     overflow: 'hidden',
     padding: 28,
   },
   orbOne: {
-    backgroundColor: '#9788f7',
+    backgroundColor: '#B41FFF',
     borderRadius: 220,
     height: 440,
     opacity: 0.28,
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     width: 440,
   },
   orbTwo: {
-    backgroundColor: '#006eff',
+    backgroundColor: '#2222FC',
     borderRadius: 170,
     bottom: -120,
     height: 340,
@@ -127,13 +127,13 @@ const styles = StyleSheet.create({
   },
   logo: {
     alignItems: 'center',
-    backgroundColor: '#050B1E',
-    borderColor: '#37e895',
+    backgroundColor: '#B41FFF',
+    borderColor: '#FFDA1F',
     borderRadius: 34,
     borderWidth: 2,
     height: 170,
     justifyContent: 'center',
-    shadowColor: '#37e895',
+    shadowColor: '#FFDA1F',
     shadowOpacity: 0.35,
     shadowRadius: 28,
     width: 300,
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   subtitle: {
-    color: '#9788f7',
+    color: '#FFDA1F',
     fontSize: 17,
     fontWeight: '700',
     marginTop: 10,
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     right: 24,
   },
   footerText: {
-    color: '#37e895',
+    color: '#B4FF1F',
     fontSize: 13,
     fontWeight: '800',
     letterSpacing: 0.4,

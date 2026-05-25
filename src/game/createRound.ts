@@ -18,26 +18,59 @@ function pickImpostorIds(players: Player[], impostorCount: number, recentImposto
     .map((player) => player.id);
 }
 
+function pickFirstSpeaker(players: Player[], usedSpeakerIds: number[]) {
+  const usedIdSet = new Set(usedSpeakerIds);
+  const eligiblePlayers = players.filter((player) => !usedIdSet.has(player.id));
+  const pool = eligiblePlayers.length ? eligiblePlayers : players;
+
+  return pool[randomIndex(pool.length)];
+}
+
+function getSecondClue(word: string, firstClue: string) {
+  const firstKey = firstClue.toLocaleLowerCase();
+  const fallbackWords = word
+    .split(/\s+/)
+    .map((item) => item.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g, ''))
+    .filter((item) => item.length > 3 && item.toLocaleLowerCase() !== firstKey);
+
+  return fallbackWords[0] ?? 'Biblia';
+}
+
+function assignImpostorClues(impostorIds: number[], firstClue: string, secondClue: string) {
+  return impostorIds.reduce<Record<number, string>>((clues, impostorId, index) => {
+    clues[impostorId] = index % 2 === 0 ? firstClue : secondClue;
+    return clues;
+  }, {});
+}
+
+export function pickNextFirstSpeaker(players: Player[], usedSpeakerIds: number[]) {
+  return pickFirstSpeaker(players, usedSpeakerIds).id;
+}
+
 export function createRound(
   players: Player[],
   impostorCount: number,
   categoryId: string,
   usedWords: string[],
   recentImpostorNames: string[],
+  usedSpeakerIds: number[],
 ): Round {
   const entries = getEntriesForCategory(categoryId);
   const usedWordSet = new Set(usedWords.map((word) => word.toLocaleLowerCase()));
   const availableEntries = entries.filter((entry) => !usedWordSet.has(entry.word.toLocaleLowerCase()));
   const pool = availableEntries.length ? availableEntries : entries;
   const selectedEntry = pool[randomIndex(pool.length)];
-  const firstSpeaker = players[randomIndex(players.length)];
+  const impostorIds = pickImpostorIds(players, impostorCount, recentImpostorNames);
+  const secondClue = getSecondClue(selectedEntry.word, selectedEntry.clue);
+  const firstSpeakerId = pickNextFirstSpeaker(players, usedSpeakerIds);
 
   return {
     word: selectedEntry.word,
-    impostorIds: pickImpostorIds(players, impostorCount, recentImpostorNames),
+    impostorIds,
     impostorClue: selectedEntry.clue,
+    impostorCluesById: assignImpostorClues(impostorIds, selectedEntry.clue, secondClue),
     impostorReference: selectedEntry.references,
-    firstSpeakerId: firstSpeaker.id,
+    firstSpeakerId,
   };
 }
 

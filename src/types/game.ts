@@ -24,6 +24,7 @@ export type Round = {
   word: string;
   impostorIds: number[];
   impostorClue: string;
+  impostorCluesById: Record<number, string>;
   impostorReference: string;
   firstSpeakerId: number;
 };
