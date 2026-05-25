@@ -25,6 +25,7 @@ export type Round = {
   impostorIds: number[];
   impostorClue: string;
   impostorReference: string;
+  firstSpeakerId: number;
 };
 
 export type GameResult = 'innocents' | 'impostor' | null;

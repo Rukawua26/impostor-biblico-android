@@ -1,5 +1,4 @@
-import { getWordsForCategory } from '../data/bibleDeck';
-import { fallbackImpostorClue, impostorClues } from '../data/impostorPhrases';
+import { getEntriesForCategory } from '../data/bibleDeck';
 import type { Player, Round } from '../types/game';
 
 function randomIndex(max: number) {
@@ -13,19 +12,25 @@ function pickImpostorIds(players: Player[], impostorCount: number) {
     .map((player) => player.id);
 }
 
-export function createRound(players: Player[], impostorCount: number, categoryId: string): Round {
-  const words = getWordsForCategory(categoryId);
-  const word = words[randomIndex(words.length)];
-  const matchingClues = impostorClues.filter((clue) => clue.relatedWords.includes(word));
-  const selectedClue = matchingClues.length
-    ? matchingClues[randomIndex(matchingClues.length)]
-    : fallbackImpostorClue;
+export function createRound(
+  players: Player[],
+  impostorCount: number,
+  categoryId: string,
+  usedWords: string[],
+): Round {
+  const entries = getEntriesForCategory(categoryId);
+  const usedWordSet = new Set(usedWords.map((word) => word.toLocaleLowerCase()));
+  const availableEntries = entries.filter((entry) => !usedWordSet.has(entry.word.toLocaleLowerCase()));
+  const pool = availableEntries.length ? availableEntries : entries;
+  const selectedEntry = pool[randomIndex(pool.length)];
+  const firstSpeaker = players[randomIndex(players.length)];
 
   return {
-    word,
+    word: selectedEntry.word,
     impostorIds: pickImpostorIds(players, impostorCount),
-    impostorClue: selectedClue.clue,
-    impostorReference: selectedClue.reference,
+    impostorClue: selectedEntry.clue,
+    impostorReference: selectedEntry.references,
+    firstSpeakerId: firstSpeaker.id,
   };
 }
 

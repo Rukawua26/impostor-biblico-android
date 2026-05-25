@@ -13,17 +13,17 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { bibleCategories } from './src/data/bibleDeck';
+import { bibleCategories, getEntriesForCategory } from './src/data/bibleDeck';
 import { IntroScreen } from './src/components/IntroScreen';
 import { defaultPlayers } from './src/data/defaultPlayers';
 import { createRound, normalizePlayers } from './src/game/createRound';
+import {
+  loadFrequentPlayers,
+  loadUsedWords,
+  saveFrequentPlayers,
+  saveUsedWords,
+} from './src/storage/gameStorage';
 import type { GameResult, GameSettings, Phase, Player, Round } from './src/types/game';
-
-type VoteTally = {
-  playerId: number;
-  name: string;
-  votes: number;
-};
 
 const defaultSettings: GameSettings = {
   discussionMinutes: 0,
@@ -37,6 +37,9 @@ export default function App() {
   const [showIntro, setShowIntro] = useState(true);
   const [phase, setPhase] = useState<Phase>('setup');
   const [allPlayers, setAllPlayers] = useState<Player[]>(defaultPlayers);
+  const [frequentPlayers, setFrequentPlayers] = useState<string[]>(defaultPlayers.map((player) => player.name));
+  const [newFrequentPlayerName, setNewFrequentPlayerName] = useState('');
+  const [usedWords, setUsedWords] = useState<string[]>([]);
   const [activePlayers, setActivePlayers] = useState<Player[]>([]);
   const [settings, setSettings] = useState<GameSettings>(defaultSettings);
   const [round, setRound] = useState<Round | null>(null);
@@ -51,17 +54,12 @@ export default function App() {
   const [eliminatedIds, setEliminatedIds] = useState<number[]>([]);
   const [gameResult, setGameResult] = useState<GameResult>(null);
   const [eliminatedPlayerName, setEliminatedPlayerName] = useState('');
-  const [voterIndex, setVoterIndex] = useState(0);
-  const [votes, setVotes] = useState<Record<number, number>>({});
-  const [eligibleVoteIds, setEligibleVoteIds] = useState<number[] | null>(null);
-  const [voteMessage, setVoteMessage] = useState('');
-  const [voteTally, setVoteTally] = useState<VoteTally[]>([]);
   const curtainTranslateY = useRef(new Animated.Value(0)).current;
 
   const impostorPlayers = activePlayers.filter((player) => round?.impostorIds.includes(player.id));
   const currentPlayer = activePlayers[revealIndex];
-  const currentVoter = activePlayers[voterIndex];
   const selectedPlayer = activePlayers.find((player) => player.id === selectedVoteId);
+  const firstSpeaker = activePlayers.find((player) => player.id === round?.firstSpeakerId);
   const normalizedAll = useMemo(() => normalizePlayers(allPlayers), [allPlayers]);
   const canStart =
     normalizedAll.length >= 3 &&
@@ -82,11 +80,6 @@ export default function App() {
   const visibleActivePlayers = activePlayers.filter(
     (player) => !visibleEliminatedIds.includes(player.id),
   );
-  const voteCandidates = activePlayers.filter((player) => {
-    if (!eligibleVoteIds) return true;
-
-    return eligibleVoteIds.includes(player.id);
-  });
   const activeImpostorIds = round?.impostorIds.filter(
     (id) => activePlayers.some((player) => player.id === id) && !visibleEliminatedIds.includes(id),
   ) ?? [];
@@ -120,6 +113,35 @@ export default function App() {
       }),
     [cardVisible, curtainLifted, curtainTranslateY, phase],
   );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSavedData() {
+      const [savedPlayers, savedUsedWords] = await Promise.all([
+        loadFrequentPlayers(),
+        loadUsedWords(),
+      ]);
+
+      if (!isMounted) return;
+
+      if (savedPlayers.length > 0) {
+        setFrequentPlayers(savedPlayers);
+        setAllPlayers(savedPlayers.slice(0, Math.max(3, Math.min(savedPlayers.length, 6))).map((name, index) => ({
+          id: Date.now() + index,
+          name,
+        })));
+      }
+
+      setUsedWords(savedUsedWords);
+    }
+
+    loadSavedData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (phase !== 'discussion' || discussionTimeLeft <= 0) return;
@@ -160,11 +182,30 @@ export default function App() {
     setSetupMessage('');
   }
 
-  function addPlayer() {
-    setAllPlayers((current) => [
-      ...current,
-      { id: Date.now(), name: `Jugador ${current.length + 1}` },
-    ]);
+  function addPlayerByName(name: string) {
+    const cleanName = name.trim();
+    if (!cleanName) return;
+
+    setAllPlayers((current) => {
+      const exists = current.some(
+        (player) => player.name.trim().toLocaleLowerCase() === cleanName.toLocaleLowerCase(),
+      );
+
+      if (exists) return current;
+
+      return [...current, { id: Date.now() + current.length, name: cleanName }];
+    });
+    setSetupMessage('');
+  }
+
+  async function addFrequentPlayer() {
+    const cleanName = newFrequentPlayerName.trim();
+    if (!cleanName) return;
+
+    const nextFrequentPlayers = await saveFrequentPlayers([...frequentPlayers, cleanName]);
+    setFrequentPlayers(nextFrequentPlayers);
+    addPlayerByName(cleanName);
+    setNewFrequentPlayerName('');
   }
 
   function removePlayer(id: number) {
@@ -172,7 +213,15 @@ export default function App() {
     setSetupMessage('');
   }
 
-  function startGame() {
+  async function removeFrequentPlayer(name: string) {
+    const nextFrequentPlayers = await saveFrequentPlayers(
+      frequentPlayers.filter((playerName) => playerName.toLocaleLowerCase() !== name.toLocaleLowerCase()),
+    );
+
+    setFrequentPlayers(nextFrequentPlayers);
+  }
+
+  async function startGame() {
     const players = normalizePlayers(allPlayers);
 
     if (players.length < 3) {
@@ -190,9 +239,28 @@ export default function App() {
       return;
     }
 
+    const entries = getEntriesForCategory(settings.categoryId);
+    const usedWordSet = new Set(usedWords.map((word) => word.toLocaleLowerCase()));
+    const hasAvailableWord = entries.some((entry) => !usedWordSet.has(entry.word.toLocaleLowerCase()));
+    const nextRound = createRound(
+      players,
+      settings.impostorCount,
+      settings.categoryId,
+      hasAvailableWord ? usedWords : [],
+    );
+    const nextUsedWords = await saveUsedWords(
+      hasAvailableWord ? [...usedWords, nextRound.word] : [nextRound.word],
+    );
+    const nextFrequentPlayers = await saveFrequentPlayers([
+      ...frequentPlayers,
+      ...players.map((player) => player.name),
+    ]);
+
+    setFrequentPlayers(nextFrequentPlayers);
+    setUsedWords(nextUsedWords);
     setAllPlayers(players);
     setActivePlayers(players);
-    setRound(createRound(players, settings.impostorCount, settings.categoryId));
+    setRound(nextRound);
     setRevealIndex(0);
     setCardVisible(false);
     resetCurtain();
@@ -203,11 +271,6 @@ export default function App() {
     setEliminatedIds([]);
     setGameResult(null);
     setEliminatedPlayerName('');
-    setVoterIndex(0);
-    setVotes({});
-    setEligibleVoteIds(null);
-    setVoteMessage('');
-    setVoteTally([]);
     setPhase('rules');
   }
 
@@ -240,54 +303,7 @@ export default function App() {
   function goToVote() {
     setVoteTimeLeft(settings.voteMinutes * 60);
     setSelectedVoteId(null);
-    setVoterIndex(0);
-    setVotes({});
-    setEligibleVoteIds(null);
-    setVoteMessage('');
-    setVoteTally([]);
     setPhase('vote');
-  }
-
-  function finishVoting(finalVotes: Record<number, number>) {
-    const tally = voteCandidates
-      .map((player) => ({
-        playerId: player.id,
-        name: player.name,
-        votes: Object.values(finalVotes).filter((voteId) => voteId === player.id).length,
-      }))
-      .sort((a, b) => b.votes - a.votes || a.name.localeCompare(b.name));
-    const maxVotes = tally[0]?.votes ?? 0;
-    const tiedPlayers = tally.filter((item) => item.votes === maxVotes);
-
-    setVoteTally(tally);
-
-    if (tiedPlayers.length > 1) {
-      setVotes({});
-      setVoterIndex(0);
-      setSelectedVoteId(null);
-      setEligibleVoteIds(tiedPlayers.map((player) => player.playerId));
-      setVoteTimeLeft(settings.voteMinutes * 60);
-      setVoteMessage(`Empate entre ${tiedPlayers.map((player) => player.name).join(', ')}. Voten de nuevo solo entre ellos.`);
-      return;
-    }
-
-    handleVoteResult(tiedPlayers[0].playerId);
-  }
-
-  function submitVote() {
-    if (!currentVoter || !selectedVoteId) return;
-
-    const nextVotes = { ...votes, [currentVoter.id]: selectedVoteId };
-
-    if (voterIndex < activePlayers.length - 1) {
-      setVotes(nextVotes);
-      setVoterIndex((current) => current + 1);
-      setSelectedVoteId(null);
-      return;
-    }
-
-    setVotes(nextVotes);
-    finishVoting(nextVotes);
   }
 
   function handleVoteResult(eliminatedId: number) {
@@ -336,10 +352,6 @@ export default function App() {
     setCardVisible(false);
     resetCurtain();
     setSelectedVoteId(null);
-    setVoterIndex(0);
-    setVotes({});
-    setEligibleVoteIds(null);
-    setVoteMessage('');
     setPhase('discussion');
   }
 
@@ -355,11 +367,6 @@ export default function App() {
     setEliminatedIds([]);
     setGameResult(null);
     setEliminatedPlayerName('');
-    setVoterIndex(0);
-    setVotes({});
-    setEligibleVoteIds(null);
-    setVoteMessage('');
-    setVoteTally([]);
   }
 
   function formatTime(seconds: number) {
@@ -391,8 +398,54 @@ export default function App() {
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>Jugadores</Text>
               <Text style={styles.helperText}>
-                Minimo 3. Los nombres repetidos se ignoran.
+                Selecciona jugadores frecuentes o agrega personas nuevas. Minimo 3.
               </Text>
+
+              <Text style={styles.settingLabel}>Jugadores frecuentes</Text>
+              <View style={styles.frequentList}>
+                {frequentPlayers.map((name) => {
+                  const selected = allPlayers.some(
+                    (player) => player.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase(),
+                  );
+
+                  return (
+                    <View key={name} style={styles.frequentRow}>
+                      <Pressable
+                        style={[
+                          styles.frequentNameButton,
+                          selected && styles.frequentNameButtonSelected,
+                        ]}
+                        onPress={() => addPlayerByName(name)}
+                      >
+                        <Text style={styles.frequentNameText}>{name}</Text>
+                      </Pressable>
+                      <Pressable
+                        style={styles.smallButton}
+                        onPress={() => removeFrequentPlayer(name)}
+                      >
+                        <Text style={styles.smallButtonText}>X</Text>
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+
+              <View style={styles.playerRow}>
+                <TextInput
+                  style={styles.input}
+                  value={newFrequentPlayerName}
+                  placeholder="Nombre nuevo"
+                  placeholderTextColor="#9788f7"
+                  returnKeyType="done"
+                  onChangeText={setNewFrequentPlayerName}
+                  onSubmitEditing={addFrequentPlayer}
+                />
+                <Pressable style={styles.addButton} onPress={addFrequentPlayer}>
+                  <Text style={styles.smallButtonText}>+</Text>
+                </Pressable>
+              </View>
+
+              <Text style={styles.settingLabel}>Jugadores de esta partida</Text>
               {allPlayers.map((player, index) => (
                 <View key={player.id} style={styles.playerRow}>
                   <TextInput
@@ -413,9 +466,6 @@ export default function App() {
                   )}
                 </View>
               ))}
-              <Pressable style={styles.secondaryButton} onPress={addPlayer}>
-                <Text style={styles.secondaryButtonText}>Agregar jugador</Text>
-              </Pressable>
               {setupMessage ? (
                 <Text style={styles.warningText}>{setupMessage}</Text>
               ) : null}
@@ -527,21 +577,21 @@ export default function App() {
               memorizarla.
             </Text>
             <Text style={styles.ruleText}>
-              3. Cada jugador da pistas sin decir la frase exacta.
+              3. La app elige al azar quien empieza a dar pistas.
             </Text>
             <Text style={styles.ruleText}>
-              4. En cada votacion, cada jugador vota en secreto desde el mismo
-              telefono.
+              4. Cada jugador da pistas sin decir la frase exacta.
             </Text>
             <Text style={styles.ruleText}>
-              5. Si eliminan a todos los impostores, el grupo gana.
+              5. En la votacion todos levantan la mano y el facilitador registra
+              al eliminado.
             </Text>
             <Text style={styles.ruleText}>
-              6. Si votan a un inocente, ese jugador queda eliminado y la
+              6. Si eliminan a todos los impostores, el grupo gana.
+            </Text>
+            <Text style={styles.ruleText}>
+              7. Si votan a un inocente, ese jugador queda eliminado y la
               siguiente ronda empieza sin volver a mostrar la palabra.
-            </Text>
-            <Text style={styles.ruleText}>
-              7. Si hay empate, se repite la votacion solo entre empatados.
             </Text>
             <Text style={styles.ruleText}>
               8. Si queda al menos un impostor tras {settings.maxRounds} rondas,
@@ -647,6 +697,12 @@ export default function App() {
             <Text style={styles.bodyText}>
               Cada jugador da una pista breve. Los impostores deben fingir.
             </Text>
+            {firstSpeaker ? (
+              <View style={styles.listCard}>
+                <Text style={styles.listTitle}>Empieza</Text>
+                <Text style={styles.listText}>{firstSpeaker.name}</Text>
+              </View>
+            ) : null}
             <Text style={styles.helperText}>
               Tiempo restante de discusion. Pueden avanzar antes si todos estan
               listos.
@@ -673,23 +729,13 @@ export default function App() {
 
         {phase === 'vote' && (
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Vota {currentVoter?.name}</Text>
+            <Text style={styles.sectionTitle}>Votacion fisica</Text>
             <Text style={styles.timerText}>{formatTime(voteTimeLeft)}</Text>
             <Text style={styles.helperText}>
-              Voto {Math.min(voterIndex + 1, activePlayers.length)} de {activePlayers.length}. Pasa el telefono al jugador indicado.
+              Todos votan levantando la mano. El facilitador marca al jugador que
+              el grupo decidio eliminar.
             </Text>
-            {voteMessage ? <Text style={styles.warningText}>{voteMessage}</Text> : null}
-            {voteTally.length > 0 && (
-              <View style={styles.listCard}>
-                <Text style={styles.listTitle}>Conteo anterior</Text>
-                {voteTally.map((item) => (
-                  <Text key={item.playerId} style={styles.listText}>
-                    {item.name}: {item.votes} voto{item.votes === 1 ? '' : 's'}
-                  </Text>
-                ))}
-              </View>
-            )}
-            {voteCandidates.map((player) => {
+            {activePlayers.map((player) => {
               return (
                 <Pressable
                   key={player.id}
@@ -703,12 +749,20 @@ export default function App() {
                 </Pressable>
               );
             })}
+            {selectedPlayer ? (
+              <Text style={styles.warningText}>
+                Confirmar eliminado: {selectedPlayer.name}
+              </Text>
+            ) : null}
             <Pressable
               style={[styles.primaryButton, !selectedVoteId && styles.disabledButton]}
               disabled={!selectedVoteId}
-              onPress={submitVote}
+              onPress={() => selectedVoteId && handleVoteResult(selectedVoteId)}
             >
-              <Text style={styles.primaryButtonText}>Registrar voto</Text>
+              <Text style={styles.primaryButtonText}>Confirmar eliminado</Text>
+            </Pressable>
+            <Pressable style={styles.secondaryButton} onPress={startGame}>
+              <Text style={styles.secondaryButtonText}>Nueva partida</Text>
             </Pressable>
           </View>
         )}
@@ -729,16 +783,6 @@ export default function App() {
             <Text style={styles.helperText}>
               La palabra no se vuelve a mostrar. Los jugadores deben recordarla.
             </Text>
-            {voteTally.length > 0 && (
-              <View style={styles.listCard}>
-                <Text style={styles.listTitle}>Resultado de la votacion</Text>
-                {voteTally.map((item) => (
-                  <Text key={item.playerId} style={styles.listText}>
-                    {item.name}: {item.votes} voto{item.votes === 1 ? '' : 's'}
-                  </Text>
-                ))}
-              </View>
-            )}
             <View style={styles.listCard}>
               <Text style={styles.listTitle}>Siguen jugando</Text>
               <Text style={styles.listText}>
@@ -774,16 +818,6 @@ export default function App() {
                 Ultimo eliminado: {selectedPlayer?.name}
               </Text>
             ) : null}
-            {voteTally.length > 0 && (
-              <View style={styles.listCard}>
-                <Text style={styles.listTitle}>Resultado de la votacion</Text>
-                {voteTally.map((item) => (
-                  <Text key={item.playerId} style={styles.listText}>
-                    {item.name}: {item.votes} voto{item.votes === 1 ? '' : 's'}
-                  </Text>
-                ))}
-              </View>
-            )}
             {visibleEliminatedPlayers.length > 0 && (
               <View style={styles.listCardMuted}>
                 <Text style={styles.listTitle}>Eliminados</Text>
@@ -939,10 +973,44 @@ const styles = StyleSheet.create({
     minWidth: 44,
     paddingHorizontal: 12,
   },
+  addButton: {
+    alignItems: 'center',
+    backgroundColor: '#37e895',
+    borderRadius: 14,
+    justifyContent: 'center',
+    minWidth: 44,
+    paddingHorizontal: 12,
+  },
   smallButtonText: {
     color: '#FFFFFF',
     fontWeight: '900',
     fontSize: 16,
+  },
+  frequentList: {
+    gap: 10,
+    marginBottom: 14,
+  },
+  frequentRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  frequentNameButton: {
+    backgroundColor: '#050B1E',
+    borderColor: '#2D3D89',
+    borderRadius: 16,
+    borderWidth: 1,
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  frequentNameButtonSelected: {
+    backgroundColor: '#1A2460',
+    borderColor: '#37e895',
+  },
+  frequentNameText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
   },
   helperText: {
     color: '#9788f7',
