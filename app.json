@@ -14,7 +14,7 @@
       "versionCode": 14,
       "permissions": [],
       "adaptiveIcon": {
-        "backgroundColor": "#9B2EEF",
+        "backgroundColor": "#4B0C75",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -29,6 +29,12 @@
         "projectId": "702a1d3b-978f-448a-994c-0524bf2351af"
       }
     },
-    "owner": "rukawua26s-organization"
+    "owner": "rukawua26s-organization",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/702a1d3b-978f-448a-994c-0524bf2351af"
+    }
   }
 }

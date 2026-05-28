@@ -1,3 +1,5 @@
+import type { CategoryId } from '../types/game';
+
 export type BibleWordEntry = {
   word: string;
   clue: string;
@@ -5,7 +7,7 @@ export type BibleWordEntry = {
 };
 
 export type BibleCategory = {
-  id: string;
+  id: CategoryId;
   name: string;
   words: BibleWordEntry[];
 };
@@ -59,7 +61,11 @@ export const bibleCategories: BibleCategory[] = [
       { word: 'La entrada en Jerusalen', clue: 'Burro', references: 'Mateo 21:1-11' },
       { word: 'Getsemani', clue: 'Oracion', references: 'Mateo 26:36-46' },
       { word: 'La muerte de Jesus', clue: 'Madero', references: 'Mateo 27:32-54; Juan 19:17-30' },
-      { word: 'La resurreccion de Jesus', clue: 'Resurreccion', references: 'Mateo 28:1-10; 1 Corintios 15:3-8' },
+      {
+        word: 'La resurreccion de Jesus',
+        clue: 'Resurreccion',
+        references: 'Mateo 28:1-10; 1 Corintios 15:3-8',
+      },
       { word: 'Pentecostes', clue: 'Espiritu', references: 'Hechos 2:1-41' },
       { word: 'Saulo camino a Damasco', clue: 'Luz', references: 'Hechos 9:1-19' },
       { word: 'Pedro liberado de prision', clue: 'Angel', references: 'Hechos 12:5-17' },
@@ -240,24 +246,44 @@ export const bibleCategories: BibleCategory[] = [
     name: 'Profecias',
     words: [
       { word: 'La descendencia prometida', clue: 'Descendencia', references: 'Genesis 3:15; Galatas 3:16' },
-      { word: 'Bendicion para todas las naciones', clue: 'Bendicion', references: 'Genesis 22:18; Galatas 3:8' },
+      {
+        word: 'Bendicion para todas las naciones',
+        clue: 'Bendicion',
+        references: 'Genesis 22:18; Galatas 3:8',
+      },
       { word: 'El Reino mesianico', clue: 'Reino', references: 'Daniel 2:44; Mateo 6:10' },
       { word: 'El Mesias nace en Belen', clue: 'Belen', references: 'Miqueas 5:2; Mateo 2:1-6' },
       { word: 'El siervo sufriente', clue: 'Siervo', references: 'Isaias 53:3-12; Hechos 8:32-35' },
       { word: 'El principe de paz', clue: 'Paz', references: 'Isaias 9:6, 7; Lucas 1:32, 33' },
       { word: 'El nuevo pacto', clue: 'Pacto', references: 'Jeremias 31:31-34; Lucas 22:20' },
-      { word: 'Nuevo cielo y nueva tierra', clue: 'Renovacion', references: 'Isaias 65:17; 2 Pedro 3:13; Revelacion 21:1' },
+      {
+        word: 'Nuevo cielo y nueva tierra',
+        clue: 'Renovacion',
+        references: 'Isaias 65:17; 2 Pedro 3:13; Revelacion 21:1',
+      },
       { word: 'Restauracion del paraiso', clue: 'Paraiso', references: 'Isaias 11:6-9; Lucas 23:43' },
       { word: 'Resurreccion', clue: 'Vida', references: 'Daniel 12:2; Juan 5:28, 29; Hechos 24:15' },
       { word: 'Dia de Jehova', clue: 'Dia', references: 'Joel 2:31; Sofonias 1:14-18; 2 Pedro 3:10' },
-      { word: 'Buenas noticias a todas las naciones', clue: 'Predicacion', references: 'Mateo 24:14; Revelacion 14:6, 7' },
+      {
+        word: 'Buenas noticias a todas las naciones',
+        clue: 'Predicacion',
+        references: 'Mateo 24:14; Revelacion 14:6, 7',
+      },
       { word: 'La venida del Mesias', clue: 'Mesias', references: 'Daniel 9:25, 26; Juan 1:41' },
       { word: 'Entrada del rey en un burro', clue: 'Burro', references: 'Zacarias 9:9; Mateo 21:4, 5' },
-      { word: 'Traicionado por treinta piezas', clue: 'Plata', references: 'Zacarias 11:12, 13; Mateo 26:14, 15' },
+      {
+        word: 'Traicionado por treinta piezas',
+        clue: 'Plata',
+        references: 'Zacarias 11:12, 13; Mateo 26:14, 15',
+      },
       { word: 'Ropas repartidas', clue: 'Ropa', references: 'Salmo 22:18; Juan 19:23, 24' },
       { word: 'Ningun hueso quebrado', clue: 'Huesos', references: 'Salmo 34:20; Juan 19:36' },
       { word: 'Resurreccion del Cristo', clue: 'Victoria', references: 'Salmo 16:10; Hechos 2:25-32' },
-      { word: 'Gobierno sobre sus enemigos', clue: 'Estrado', references: 'Salmo 110:1, 2; Hebreos 10:12, 13' },
+      {
+        word: 'Gobierno sobre sus enemigos',
+        clue: 'Estrado',
+        references: 'Salmo 110:1, 2; Hebreos 10:12, 13',
+      },
       { word: 'Sacerdote como Melquisedec', clue: 'Sacerdote', references: 'Salmo 110:4; Hebreos 7:15-17' },
       { word: 'La piedra rechazada', clue: 'Piedra', references: 'Salmo 118:22; Mateo 21:42' },
       { word: 'Espiritu derramado', clue: 'Espiritu', references: 'Joel 2:28, 29; Hechos 2:16-21' },
@@ -270,7 +296,11 @@ export const bibleCategories: BibleCategory[] = [
       { word: 'Pestes', clue: 'Pestes', references: 'Lucas 21:11' },
       { word: 'Amor de muchos se enfria', clue: 'Amor', references: 'Mateo 24:12' },
       { word: 'La gran tribulacion', clue: 'Tribulacion', references: 'Mateo 24:21, 22; Revelacion 7:14' },
-      { word: 'Destruccion de Babilonia la Grande', clue: 'Babilonia', references: 'Revelacion 17:1-6; 18:2-8' },
+      {
+        word: 'Destruccion de Babilonia la Grande',
+        clue: 'Babilonia',
+        references: 'Revelacion 17:1-6; 18:2-8',
+      },
       { word: 'La bestia salvaje', clue: 'Bestia', references: 'Revelacion 13:1-10; 17:8-14' },
       { word: 'La marca de la bestia', clue: 'Marca', references: 'Revelacion 13:16-18; 14:9-11' },
       { word: 'Los 144000', clue: 'Sellados', references: 'Revelacion 7:4; 14:1-5' },
@@ -298,20 +328,12 @@ export const bibleCategories: BibleCategory[] = [
   },
 ];
 
-export function getEntriesForCategory(categoryId: string) {
+export function getEntriesForCategory(categoryId: CategoryId) {
   const category = bibleCategories.find((item) => item.id === categoryId);
 
   if (!category || category.id === 'mixto') {
-    return bibleCategories
-      .filter((item) => item.id !== 'mixto')
-      .flatMap((item) => item.words);
+    return bibleCategories.filter((item) => item.id !== 'mixto').flatMap((item) => item.words);
   }
 
   return category.words;
-}
-
-export function getAllBibleEntries() {
-  return bibleCategories
-    .filter((item) => item.id !== 'mixto')
-    .flatMap((item) => item.words);
 }

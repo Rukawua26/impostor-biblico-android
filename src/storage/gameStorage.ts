@@ -33,18 +33,34 @@ function uniqueCleanNames(names: string[]) {
     });
 }
 
+async function safeGet(key: string) {
+  try {
+    return await AsyncStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+async function safeSet(key: string, value: string) {
+  try {
+    await AsyncStorage.setItem(key, value);
+  } catch (e) {
+    console.warn('Storage write failed:', key, e); // eslint-disable-line no-console
+  }
+}
+
 export async function loadFrequentPlayers() {
-  return uniqueCleanNames(parseStringArray(await AsyncStorage.getItem(FREQUENT_PLAYERS_KEY)));
+  return uniqueCleanNames(parseStringArray(await safeGet(FREQUENT_PLAYERS_KEY)));
 }
 
 export async function saveFrequentPlayers(names: string[]) {
   const cleanNames = uniqueCleanNames(names);
-  await AsyncStorage.setItem(FREQUENT_PLAYERS_KEY, JSON.stringify(cleanNames));
+  await safeSet(FREQUENT_PLAYERS_KEY, JSON.stringify(cleanNames));
   return cleanNames;
 }
 
 export async function loadUsedWords() {
-  return parseStringArray(await AsyncStorage.getItem(USED_WORDS_KEY));
+  return parseStringArray(await safeGet(USED_WORDS_KEY));
 }
 
 export async function saveUsedWords(words: string[]) {
@@ -61,16 +77,16 @@ export async function saveUsedWords(words: string[]) {
       return true;
     });
 
-  await AsyncStorage.setItem(USED_WORDS_KEY, JSON.stringify(cleanWords));
+  await safeSet(USED_WORDS_KEY, JSON.stringify(cleanWords));
   return cleanWords;
 }
 
 export async function loadRecentImpostors() {
-  return parseStringArray(await AsyncStorage.getItem(RECENT_IMPOSTORS_KEY));
+  return parseStringArray(await safeGet(RECENT_IMPOSTORS_KEY));
 }
 
 export async function saveRecentImpostors(names: string[]) {
   const cleanNames = uniqueCleanNames(names);
-  await AsyncStorage.setItem(RECENT_IMPOSTORS_KEY, JSON.stringify(cleanNames));
+  await safeSet(RECENT_IMPOSTORS_KEY, JSON.stringify(cleanNames));
   return cleanNames;
 }

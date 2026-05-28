@@ -1,19 +1,27 @@
 import { getEntriesForCategory } from '../data/bibleDeck';
-import type { Player, Round } from '../types/game';
+import type { CategoryId, Player, Round } from '../types/game';
 
 function randomIndex(max: number) {
   return Math.floor(Math.random() * max);
 }
 
+function shuffledPlayers(players: Player[]) {
+  const shuffled = [...players];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = randomIndex(index + 1);
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+
+  return shuffled;
+}
+
 function pickImpostorIds(players: Player[], impostorCount: number, recentImpostorNames: string[]) {
   const recentNameSet = new Set(recentImpostorNames.map((name) => name.toLocaleLowerCase()));
-  const eligiblePlayers = players.filter(
-    (player) => !recentNameSet.has(player.name.toLocaleLowerCase()),
-  );
+  const eligiblePlayers = players.filter((player) => !recentNameSet.has(player.name.toLocaleLowerCase()));
   const pool = eligiblePlayers.length >= impostorCount ? eligiblePlayers : players;
 
-  return [...pool]
-    .sort(() => Math.random() - 0.5)
+  return shuffledPlayers(pool)
     .slice(0, impostorCount)
     .map((player) => player.id);
 }
@@ -26,14 +34,44 @@ function pickFirstSpeaker(players: Player[], usedSpeakerIds: number[]) {
   return pool[randomIndex(pool.length)];
 }
 
-function getSecondClue(word: string, firstClue: string) {
-  const firstKey = firstClue.toLocaleLowerCase();
-  const fallbackWords = word
-    .split(/\s+/)
-    .map((item) => item.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g, ''))
-    .filter((item) => item.length > 3 && item.toLocaleLowerCase() !== firstKey);
+const cluePool = [
+  'Biblia',
+  'Escritura',
+  'Relato',
+  'Historia',
+  'Palabra',
+  'Testimonio',
+  'Ensenanza',
+  'Sabiduria',
+  'Fe',
+  'Creencia',
+  'Antiguo',
+  'Pueblo',
+  'Tierra',
+  'Cielo',
+  'Alianza',
+  'Promesa',
+  'Ley',
+  'Profecia',
+  'Verdad',
+  'Luz',
+  'Vida',
+  'Amor',
+  'Paz',
+  'Esperanza',
+  'Gracia',
+  'Poder',
+  'Senal',
+  'Milagro',
+  'Mandato',
+  'Justicia',
+];
 
-  return fallbackWords[0] ?? 'Biblia';
+function pickRandomClue(exclude: string) {
+  const excludeKey = exclude.toLocaleLowerCase();
+  const available = cluePool.filter((item) => item.toLocaleLowerCase() !== excludeKey);
+
+  return available[Math.floor(Math.random() * available.length)] ?? 'Biblia';
 }
 
 function assignImpostorClues(impostorIds: number[], firstClue: string, secondClue: string) {
@@ -50,7 +88,7 @@ export function pickNextFirstSpeaker(players: Player[], usedSpeakerIds: number[]
 export function createRound(
   players: Player[],
   impostorCount: number,
-  categoryId: string,
+  categoryId: CategoryId,
   usedWords: string[],
   recentImpostorNames: string[],
   usedSpeakerIds: number[],
@@ -61,7 +99,7 @@ export function createRound(
   const pool = availableEntries.length ? availableEntries : entries;
   const selectedEntry = pool[randomIndex(pool.length)];
   const impostorIds = pickImpostorIds(players, impostorCount, recentImpostorNames);
-  const secondClue = getSecondClue(selectedEntry.word, selectedEntry.clue);
+  const secondClue = pickRandomClue(selectedEntry.clue);
   const firstSpeakerId = pickNextFirstSpeaker(players, usedSpeakerIds);
 
   return {

@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef } from 'react';
-import { Animated, Image, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef } from 'react';
+import { Animated, Easing, Image, Pressable, StyleSheet, Text } from 'react-native';
 
 type IntroScreenProps = {
   onFinish: () => void;
@@ -9,179 +9,194 @@ type IntroScreenProps = {
 const INTRO_DURATION = 8000;
 
 export function IntroScreen({ onFinish }: IntroScreenProps) {
-  const logoScale = useRef(new Animated.Value(0.82)).current;
+  const screenOpacity = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.85)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  const contentTranslate = useRef(new Animated.Value(18)).current;
-  const contentOpacity = useRef(new Animated.Value(0)).current;
-  const footerOpacity = useRef(new Animated.Value(0)).current;
-  const screenOpacity = useRef(new Animated.Value(1)).current;
+  const textOpacity = useRef(new Animated.Value(0)).current;
+  const textTranslate = useRef(new Animated.Value(15)).current;
+  const dividerOpacity = useRef(new Animated.Value(0)).current;
+  const authorOpacity = useRef(new Animated.Value(0)).current;
+  const finishedRef = useRef(false);
+
+  const finish = useCallback(() => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    onFinish();
+  }, [onFinish]);
+
+  useEffect(() => {
+    const timeout = setTimeout(finish, INTRO_DURATION);
+
+    return () => clearTimeout(timeout);
+  }, [finish]);
 
   useEffect(() => {
     Animated.sequence([
+      Animated.timing(screenOpacity, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true,
+      }),
       Animated.parallel([
+        Animated.timing(logoScale, {
+          toValue: 1,
+          duration: 400,
+          easing: Easing.out(Easing.back(1.5)),
+          useNativeDriver: true,
+        }),
         Animated.timing(logoOpacity, {
           toValue: 1,
-          duration: 550,
+          duration: 400,
           useNativeDriver: true,
-        }),
-        Animated.spring(logoScale, {
-          toValue: 1,
-          useNativeDriver: true,
-          tension: 70,
-          friction: 8,
         }),
       ]),
       Animated.parallel([
-        Animated.timing(contentOpacity, {
+        Animated.timing(textOpacity, {
           toValue: 1,
-          duration: 520,
+          duration: 350,
           useNativeDriver: true,
         }),
-        Animated.timing(contentTranslate, {
+        Animated.timing(textTranslate, {
           toValue: 0,
-          duration: 520,
+          duration: 350,
           useNativeDriver: true,
         }),
       ]),
-      Animated.timing(footerOpacity, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.delay(5550),
+      Animated.parallel([
+        Animated.timing(dividerOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(authorOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.delay(2000),
       Animated.timing(screenOpacity, {
         toValue: 0,
-        duration: 520,
+        duration: 400,
         useNativeDriver: true,
       }),
-    ]).start(onFinish);
+    ]).start(finish);
 
-    const fallback = setTimeout(onFinish, INTRO_DURATION + 500);
-    return () => clearTimeout(fallback);
-  }, [contentOpacity, contentTranslate, footerOpacity, logoOpacity, logoScale, onFinish, screenOpacity]);
+    return () => {
+      screenOpacity.stopAnimation();
+      logoScale.stopAnimation();
+      logoOpacity.stopAnimation();
+      textOpacity.stopAnimation();
+      textTranslate.stopAnimation();
+      dividerOpacity.stopAnimation();
+      authorOpacity.stopAnimation();
+    };
+  }, [
+    authorOpacity,
+    dividerOpacity,
+    finish,
+    logoOpacity,
+    logoScale,
+    screenOpacity,
+    textOpacity,
+    textTranslate,
+  ]);
 
   return (
-    <Animated.View style={[styles.container, { opacity: screenOpacity }]}>
-      <StatusBar style="light" />
-      <View style={styles.orbOne} />
-      <View style={styles.orbTwo} />
-      <Animated.View
-        style={[
-          styles.logo,
-          {
-            opacity: logoOpacity,
-            transform: [{ scale: logoScale }],
-          },
-        ]}
-      >
-        <Image source={require('../../assets/app-brand.png')} style={styles.logoImage} />
+    <Pressable style={{ flex: 1 }} onPress={finish}>
+      <Animated.View style={[styles.container, { opacity: screenOpacity }]}>
+        <StatusBar style="light" />
+        <Animated.View
+          style={[styles.logoWrapper, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}
+        >
+          <Image source={require('../../assets/icon.png')} style={styles.logo} />
+        </Animated.View>
+        <Animated.View
+          style={[styles.textBlock, { opacity: textOpacity, transform: [{ translateY: textTranslate }] }]}
+        >
+          <Text style={styles.title}>El Impostor Biblico</Text>
+          <Text style={styles.subtitle}>Juego presencial de deduccion</Text>
+        </Animated.View>
+        <Animated.View style={[styles.divider, { opacity: dividerOpacity }]} />
+        <Animated.View style={[styles.authorBlock, { opacity: authorOpacity }]}>
+          <Text style={styles.authorLabel}>Creado y desarrollado por</Text>
+          <Text style={styles.authorName}>Miguel Angel Oñate</Text>
+        </Animated.View>
       </Animated.View>
-      <Animated.View
-        style={[
-          styles.content,
-          {
-            opacity: contentOpacity,
-            transform: [{ translateY: contentTranslate }],
-          },
-        ]}
-      >
-        <Text style={styles.title}>El Impostor Biblico</Text>
-        <Text style={styles.subtitle}>Juego presencial de deduccion</Text>
-      </Animated.View>
-      <Animated.View style={[styles.footer, { opacity: footerOpacity }]}>
-        <Text style={styles.footerText}>Todos los derechos reservados</Text>
-        <Text style={styles.authorText}>Creado y desarrollado por Miguel Angel Oñate</Text>
-      </Animated.View>
-    </Animated.View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    backgroundColor: '#9B2EEF',
+    backgroundColor: '#2A23CF',
     flex: 1,
     justifyContent: 'center',
-    overflow: 'hidden',
     padding: 28,
   },
-  orbOne: {
-    backgroundColor: '#B41FFF',
-    borderRadius: 220,
-    height: 440,
-    opacity: 0.28,
-    position: 'absolute',
-    right: -190,
-    top: -120,
-    width: 440,
-  },
-  orbTwo: {
-    backgroundColor: '#2222FC',
-    borderRadius: 170,
-    bottom: -120,
-    height: 340,
-    left: -160,
-    opacity: 0.28,
-    position: 'absolute',
-    width: 340,
+  logoWrapper: {
+    alignItems: 'center',
+    backgroundColor: '#B76288',
+    borderColor: '#FF4406',
+    borderRadius: 32,
+    borderWidth: 2,
+    height: 200,
+    justifyContent: 'center',
+    shadowColor: '#FF4406',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 30,
+    width: 200,
   },
   logo: {
-    alignItems: 'center',
-    backgroundColor: '#B41FFF',
-    borderColor: '#FFDA1F',
-    borderRadius: 34,
-    borderWidth: 2,
-    height: 170,
-    justifyContent: 'center',
-    shadowColor: '#FFDA1F',
-    shadowOpacity: 0.35,
-    shadowRadius: 28,
-    width: 300,
-  },
-  logoImage: {
-    borderRadius: 28,
-    height: 150,
+    borderRadius: 24,
+    height: 180,
     resizeMode: 'cover',
-    width: 280,
+    width: 180,
   },
-  content: {
+  textBlock: {
     alignItems: 'center',
-    marginTop: 28,
+    marginTop: 24,
   },
   title: {
     color: '#FFFFFF',
-    fontSize: 38,
+    fontSize: 36,
     fontWeight: '900',
     lineHeight: 42,
     textAlign: 'center',
   },
   subtitle: {
-    color: '#FFDA1F',
+    color: '#FFFFFF',
     fontSize: 17,
     fontWeight: '700',
     marginTop: 10,
     textAlign: 'center',
   },
-  footer: {
-    bottom: 52,
-    left: 24,
-    position: 'absolute',
-    right: 24,
+  divider: {
+    backgroundColor: '#0B78B3',
+    borderRadius: 999,
+    height: 3,
+    marginTop: 28,
+    width: 80,
   },
-  footerText: {
-    color: '#B4FF1F',
-    fontSize: 13,
-    fontWeight: '800',
+  authorBlock: {
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  authorLabel: {
+    color: '#FF4406',
+    fontSize: 14,
+    fontWeight: '700',
     letterSpacing: 0.4,
     textAlign: 'center',
     textTransform: 'uppercase',
   },
-  authorText: {
+  authorName: {
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 22,
-    marginTop: 8,
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: 6,
     textAlign: 'center',
   },
 });

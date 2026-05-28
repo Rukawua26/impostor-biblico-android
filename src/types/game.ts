@@ -1,23 +1,18 @@
-export type Phase =
-  | 'setup'
-  | 'rules'
-  | 'reveal'
-  | 'discussion'
-  | 'vote'
-  | 'eliminated'
-  | 'result';
+export type Phase = 'setup' | 'rules' | 'reveal' | 'discussion' | 'vote' | 'eliminated' | 'result';
 
 export type Player = {
   id: number;
   name: string;
 };
 
+export type CategoryId = 'historias' | 'personajes' | 'lugares' | 'objetos' | 'profecias' | 'mixto';
+
 export type GameSettings = {
   discussionMinutes: number;
   voteMinutes: number;
   maxRounds: number;
   impostorCount: number;
-  categoryId: string;
+  categoryId: CategoryId;
 };
 
 export type Round = {
