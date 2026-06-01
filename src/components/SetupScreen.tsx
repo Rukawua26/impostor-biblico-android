@@ -1,7 +1,9 @@
 import Svg, { Circle, Line, Path, Polygon, Rect } from 'react-native-svg';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Button } from './ui/Button';
 import { bibleCategories } from '../data/bibleDeck';
 import type { CategoryId, GameSettings, Player } from '../types/game';
+import { useTheme } from '../context/ThemeContext';
 
 type CategoryIconProps = {
   categoryId: CategoryId;
@@ -9,8 +11,9 @@ type CategoryIconProps = {
 };
 
 function CategoryIcon({ categoryId, active }: CategoryIconProps) {
-  const stroke = active ? '#0B78B3' : '#FFFFFF';
-  const accent = active ? '#FFFFFF' : '#FF4406';
+  const { colors } = useTheme();
+  const stroke = active ? colors.onPrimaryContainer : colors.onSurfaceVariant;
+  const accent = active ? colors.primary : colors.tertiary;
 
   if (categoryId === 'historias') {
     return (
@@ -147,15 +150,23 @@ export function SetupScreen({
   onNewFrequentPlayerNameChange,
   onSettingsChange,
 }: SetupScreenProps) {
+  const { colors } = useTheme();
+  const placeholderColor = `${colors.onSurfaceVariant}99`;
+
   return (
     <>
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Jugadores</Text>
-        <Text style={styles.helperText}>
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: colors.surfaceContainerLow, borderColor: colors.surfaceVariant },
+        ]}
+      >
+        <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Jugadores</Text>
+        <Text style={[styles.helperText, { color: colors.onSurfaceVariant }]}>
           Selecciona jugadores frecuentes o agrega personas nuevas. Minimo 3.
         </Text>
 
-        <Text style={styles.settingLabel}>Jugadores frecuentes</Text>
+        <Text style={[styles.settingLabel, { color: colors.primary }]}>Jugadores frecuentes</Text>
         <View style={styles.frequentList}>
           {frequentPlayers.map((name) => {
             const selected = allPlayers.some(
@@ -165,14 +176,31 @@ export function SetupScreen({
             return (
               <View key={name} style={styles.frequentRow}>
                 <Pressable
-                  style={[styles.frequentNameButton, selected && styles.frequentNameButtonSelected]}
+                  style={({ pressed }) => [
+                    styles.frequentNameButton,
+                    {
+                      backgroundColor: selected ? colors.primaryContainer : colors.surfaceContainerHighest,
+                      borderColor: selected ? colors.primary : colors.outline,
+                      opacity: pressed ? 0.78 : 1,
+                    },
+                  ]}
                   onPress={() => onAddPlayerByName(name)}
                 >
-                  <Text style={styles.frequentNameText}>{name}</Text>
+                  <Text
+                    style={[
+                      styles.frequentNameText,
+                      { color: selected ? colors.onPrimaryContainer : colors.onSurface },
+                    ]}
+                  >
+                    {name}
+                  </Text>
                 </Pressable>
-                <Pressable style={styles.smallButton} onPress={() => onRemoveFrequentPlayer(name)}>
-                  <Text style={styles.smallButtonText}>X</Text>
-                </Pressable>
+                <Button
+                  title="X"
+                  onPress={() => onRemoveFrequentPlayer(name)}
+                  variant="outline"
+                  size="small"
+                />
               </View>
             );
           })}
@@ -180,63 +208,102 @@ export function SetupScreen({
 
         <View style={styles.playerRow}>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.surfaceContainerLowest,
+                borderColor: colors.outline,
+                color: colors.onSurface,
+              },
+            ]}
             value={newFrequentPlayerName}
             placeholder="Nombre nuevo"
-            placeholderTextColor="rgba(255,255,255,0.4)"
+            placeholderTextColor={placeholderColor}
             returnKeyType="done"
             onChangeText={onNewFrequentPlayerNameChange}
             onSubmitEditing={onAddFrequentPlayer}
           />
-          <Pressable style={styles.addButton} onPress={onAddFrequentPlayer}>
-            <Text style={styles.smallButtonText}>+</Text>
-          </Pressable>
+          <Button title="+" onPress={onAddFrequentPlayer} variant="secondary" size="small" />
         </View>
 
-        <Text style={styles.settingLabel}>Jugadores de esta partida</Text>
+        <Text style={[styles.settingLabel, { color: colors.primary }]}>Jugadores de esta partida</Text>
         {allPlayers.map((player, index) => (
           <View key={player.id} style={styles.playerRow}>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.surfaceContainerLowest,
+                  borderColor: colors.outline,
+                  color: colors.onSurface,
+                },
+              ]}
               value={player.name}
               placeholder={`Jugador ${index + 1}`}
-              placeholderTextColor="rgba(255,255,255,0.4)"
+              placeholderTextColor={placeholderColor}
               returnKeyType="done"
               onChangeText={(name) => onUpdatePlayerName(player.id, name)}
             />
             {allPlayers.length > 3 && (
-              <Pressable style={styles.smallButton} onPress={() => onRemovePlayer(player.id)}>
-                <Text style={styles.smallButtonText}>X</Text>
-              </Pressable>
+              <Button title="X" onPress={() => onRemovePlayer(player.id)} variant="outline" size="small" />
             )}
           </View>
         ))}
-        {setupMessage ? <Text style={styles.warningText}>{setupMessage}</Text> : null}
+        {setupMessage ? (
+          <Text style={[styles.warningText, { color: colors.error }]}>{setupMessage}</Text>
+        ) : null}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Configuracion</Text>
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: colors.surfaceContainerLow, borderColor: colors.surfaceVariant },
+        ]}
+      >
+        <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Configuracion</Text>
 
-        <Text style={styles.settingLabel}>Categoria</Text>
+        <Text style={[styles.settingLabel, { color: colors.primary }]}>Categoria</Text>
         <View style={styles.optionGrid}>
-          {bibleCategories.map((category) => (
-            <Pressable
-              key={category.id}
-              style={[
-                styles.categoryButton,
-                settings.categoryId === category.id && styles.categoryButtonSelected,
-              ]}
-              onPress={() => onSettingsChange({ ...settings, categoryId: category.id })}
-            >
-              <CategoryIcon categoryId={category.id} active={settings.categoryId === category.id} />
-              <Text style={styles.categoryButtonText}>{category.name}</Text>
-            </Pressable>
-          ))}
+          {bibleCategories.map((category) => {
+            const selected = settings.categoryId === category.id;
+
+            return (
+              <Pressable
+                key={category.id}
+                style={({ pressed }) => [
+                  styles.categoryButton,
+                  {
+                    backgroundColor: selected ? colors.primaryContainer : colors.surfaceContainerHighest,
+                    borderColor: selected ? colors.primary : colors.surfaceVariant,
+                    opacity: pressed ? 0.78 : 1,
+                  },
+                ]}
+                onPress={() => onSettingsChange({ ...settings, categoryId: category.id })}
+              >
+                <CategoryIcon categoryId={category.id} active={selected} />
+                <Text
+                  style={[
+                    styles.categoryButtonText,
+                    { color: selected ? colors.onPrimaryContainer : colors.onSurface },
+                  ]}
+                >
+                  {category.name}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
 
-        <Text style={styles.settingLabel}>Cantidad de impostores</Text>
+        <Text style={[styles.settingLabel, { color: colors.primary }]}>Cantidad de impostores</Text>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              backgroundColor: colors.surfaceContainerLowest,
+              borderColor: colors.outline,
+              color: colors.onSurface,
+            },
+          ]}
           value={String(settings.impostorCount)}
           onChangeText={(text) => {
             const num = parseInt(text || '0', 10);
@@ -247,12 +314,19 @@ export function SetupScreen({
           keyboardType="number-pad"
           returnKeyType="done"
           placeholder="1"
-          placeholderTextColor="rgba(255,255,255,0.4)"
+          placeholderTextColor={placeholderColor}
         />
 
-        <Text style={styles.settingLabel}>Tiempo de discusion (minutos)</Text>
+        <Text style={[styles.settingLabel, { color: colors.primary }]}>Tiempo de discusion (minutos)</Text>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              backgroundColor: colors.surfaceContainerLowest,
+              borderColor: colors.outline,
+              color: colors.onSurface,
+            },
+          ]}
           value={String(settings.discussionMinutes)}
           onChangeText={(text) => {
             const num = parseInt(text || '0', 10);
@@ -263,12 +337,19 @@ export function SetupScreen({
           keyboardType="number-pad"
           returnKeyType="done"
           placeholder="0"
-          placeholderTextColor="rgba(255,255,255,0.4)"
+          placeholderTextColor={placeholderColor}
         />
 
-        <Text style={styles.settingLabel}>Tiempo de votacion (minutos)</Text>
+        <Text style={[styles.settingLabel, { color: colors.primary }]}>Tiempo de votacion (minutos)</Text>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              backgroundColor: colors.surfaceContainerLowest,
+              borderColor: colors.outline,
+              color: colors.onSurface,
+            },
+          ]}
           value={String(settings.voteMinutes)}
           onChangeText={(text) => {
             const num = parseInt(text || '0', 10);
@@ -279,12 +360,19 @@ export function SetupScreen({
           keyboardType="number-pad"
           returnKeyType="done"
           placeholder="0"
-          placeholderTextColor="rgba(255,255,255,0.4)"
+          placeholderTextColor={placeholderColor}
         />
 
-        <Text style={styles.settingLabel}>Rondas maximas</Text>
+        <Text style={[styles.settingLabel, { color: colors.primary }]}>Rondas maximas</Text>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              backgroundColor: colors.surfaceContainerLowest,
+              borderColor: colors.outline,
+              color: colors.onSurface,
+            },
+          ]}
           value={String(settings.maxRounds)}
           onChangeText={(text) => {
             const num = parseInt(text, 10);
@@ -295,16 +383,16 @@ export function SetupScreen({
           keyboardType="number-pad"
           returnKeyType="done"
           placeholder="20"
-          placeholderTextColor="rgba(255,255,255,0.4)"
+          placeholderTextColor={placeholderColor}
         />
 
-        <Pressable
-          style={[styles.primaryButton, !canStart && styles.disabledButton]}
-          disabled={!canStart}
+        <Button
+          title="Iniciar partida"
           onPress={onStartGame}
-        >
-          <Text style={styles.primaryButtonText}>Iniciar partida</Text>
-        </Pressable>
+          variant="primary"
+          disabled={!canStart}
+          size="large"
+        />
       </View>
     </>
   );
@@ -312,15 +400,12 @@ export function SetupScreen({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#B76288',
-    borderColor: '#0B78B3',
     borderRadius: 32,
     borderWidth: 1,
     marginBottom: 14,
     padding: 18,
   },
   sectionTitle: {
-    color: '#FFFFFF',
     fontSize: 23,
     fontWeight: '800',
     letterSpacing: -0.2,
@@ -332,51 +417,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   input: {
-    backgroundColor: '#B76288',
-    borderColor: '#0B78B3',
     borderRadius: 16,
     borderWidth: 1,
-    color: '#FFFFFF',
     flex: 1,
     fontSize: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
-  },
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: '#FF4406',
-    borderRadius: 20,
-    marginTop: 16,
-    paddingVertical: 15,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  disabledButton: {
-    opacity: 0.45,
-  },
-  smallButton: {
-    alignItems: 'center',
-    backgroundColor: '#0B78B3',
-    borderRadius: 14,
-    justifyContent: 'center',
-    minWidth: 44,
-    paddingHorizontal: 12,
-  },
-  addButton: {
-    alignItems: 'center',
-    backgroundColor: '#0B78B3',
-    borderRadius: 14,
-    justifyContent: 'center',
-    minWidth: 44,
-    paddingHorizontal: 12,
-  },
-  smallButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 16,
   },
   frequentList: {
     gap: 10,
@@ -387,39 +433,31 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   frequentNameButton: {
-    backgroundColor: '#B76288',
-    borderColor: '#0B78B3',
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     flex: 1,
+    justifyContent: 'center',
+    minHeight: 48,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  frequentNameButtonSelected: {
-    backgroundColor: '#FF4406',
-    borderColor: '#0B78B3',
-  },
   frequentNameText: {
-    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
   },
   helperText: {
-    color: '#FFFFFF',
     fontSize: 15,
     lineHeight: 21,
     marginBottom: 16,
   },
   warningText: {
-    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
     marginTop: 12,
   },
   settingLabel: {
-    color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
     marginBottom: 8,
     marginTop: 12,
   },
@@ -431,21 +469,14 @@ const styles = StyleSheet.create({
   },
   categoryButton: {
     alignItems: 'center',
-    backgroundColor: '#B76288',
-    borderColor: '#0B78B3',
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
     gap: 8,
     minWidth: '30%',
     paddingHorizontal: 12,
     paddingVertical: 14,
   },
-  categoryButtonSelected: {
-    backgroundColor: '#FF4406',
-    borderColor: '#0B78B3',
-  },
   categoryButtonText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
     textAlign: 'center',

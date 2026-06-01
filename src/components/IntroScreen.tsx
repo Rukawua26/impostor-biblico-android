@@ -1,14 +1,16 @@
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef } from 'react';
-import { Animated, Easing, Image, Pressable, StyleSheet, Text } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, Text } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 type IntroScreenProps = {
   onFinish: () => void;
 };
 
-const INTRO_DURATION = 8000;
+const INTRO_DURATION = 6000;
 
 export function IntroScreen({ onFinish }: IntroScreenProps) {
+  const { colors } = useTheme();
   const screenOpacity = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.85)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -103,27 +105,38 @@ export function IntroScreen({ onFinish }: IntroScreenProps) {
   ]);
 
   return (
-    <Pressable style={{ flex: 1 }} onPress={finish}>
-      <Animated.View style={[styles.container, { opacity: screenOpacity }]}>
-        <StatusBar style="light" />
-        <Animated.View
-          style={[styles.logoWrapper, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}
-        >
-          <Image source={require('../../assets/icon.png')} style={styles.logo} />
-        </Animated.View>
-        <Animated.View
-          style={[styles.textBlock, { opacity: textOpacity, transform: [{ translateY: textTranslate }] }]}
-        >
-          <Text style={styles.title}>El Impostor Biblico</Text>
-          <Text style={styles.subtitle}>Juego presencial de deduccion</Text>
-        </Animated.View>
-        <Animated.View style={[styles.divider, { opacity: dividerOpacity }]} />
-        <Animated.View style={[styles.authorBlock, { opacity: authorOpacity }]}>
-          <Text style={styles.authorLabel}>Creado y desarrollado por</Text>
-          <Text style={styles.authorName}>Miguel Angel Oñate</Text>
-        </Animated.View>
+    <Animated.View style={[styles.container, { opacity: screenOpacity, backgroundColor: colors.background }]}>
+      <StatusBar style="light" />
+      <Animated.View
+        style={[
+          styles.logoWrapper,
+          {
+            opacity: logoOpacity,
+            transform: [{ scale: logoScale }],
+            backgroundColor: colors.secondaryContainer,
+            borderColor: colors.outline,
+          },
+        ]}
+      >
+        <Image source={require('../../assets/icon.png')} style={styles.logo} />
       </Animated.View>
-    </Pressable>
+      <Animated.View
+        style={[styles.textBlock, { opacity: textOpacity, transform: [{ translateY: textTranslate }] }]}
+      >
+        <Text style={[styles.title, { color: colors.onSurface }]}>El Impostor Biblico</Text>
+        <Text style={[styles.subtitle, { color: colors.onSurfaceVariant }]}>
+          Juego presencial de deduccion
+        </Text>
+      </Animated.View>
+      <Animated.View style={[styles.divider, { opacity: dividerOpacity, backgroundColor: colors.primary }]} />
+      <Animated.View style={[styles.authorBlock, { opacity: authorOpacity }]}>
+        <Text style={[styles.authorLabel, { color: colors.onSurfaceVariant }]}>Creado por</Text>
+        <Text style={[styles.authorName, { color: colors.onSurface }]}>Miguel Angel Oñate</Text>
+        <Text style={[styles.rightsText, { color: colors.onSurfaceVariant }]}>
+          Reservados todos los derechos
+        </Text>
+      </Animated.View>
+    </Animated.View>
   );
 }
 
@@ -198,5 +211,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 6,
     textAlign: 'center',
+  },
+  rightsText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    marginTop: 14,
+    textAlign: 'center',
+    textTransform: 'uppercase',
   },
 });

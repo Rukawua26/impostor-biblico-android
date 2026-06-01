@@ -1,17 +1,14 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useReducer, useState } from 'react';
-import {
-  Animated,
-  KeyboardAvoidingView,
-  PanResponder,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { SocketProvider, useSocket } from './src/context/SocketContext';
+import { Animated, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getEntriesForCategory } from './src/data/bibleDeck';
 import { IntroScreen } from './src/components/IntroScreen';
+import { GameModeScreen } from './src/components/GameModeScreen';
+import { OnlineSetupScreen } from './src/components/OnlineSetupScreen';
+import { WaitingRoomScreen } from './src/components/WaitingRoomScreen';
+import { OnlineGameScreen } from './src/components/OnlineGameScreen';
 import { SetupScreen } from './src/components/SetupScreen';
 import { DiscussionScreen } from './src/components/DiscussionScreen';
 import { RevealScreen } from './src/components/RevealScreen';
@@ -35,13 +32,27 @@ import type { Player } from './src/types/game';
 import { gameReducer, initialGameState } from './src/game/gameReducer';
 
 export default function App() {
+  return (
+    <ThemeProvider>
+      <SocketProvider>
+        <GameApp />
+      </SocketProvider>
+    </ThemeProvider>
+  );
+}
+
+type GameMode = 'selecting' | 'presencial' | 'online';
+
+function GameApp() {
+  const { colors, isDarkMode } = useTheme();
+  const { roomCode, leaveRoom, gameStarted, myRole } = useSocket();
+  const [gameMode, setGameMode] = useState<GameMode>('selecting');
   const [showIntro, setShowIntro] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [state, dispatch] = useReducer(gameReducer, initialGameState);
   const [newFrequentPlayerName, setNewFrequentPlayerName] = useState('');
   const [setupMessage, setSetupMessage] = useState('');
 
-  const curtainTranslateY = useRef(new Animated.Value(0)).current;
   const firstSpeakerPulse = useRef(new Animated.Value(0)).current;
 
   const {
@@ -52,7 +63,6 @@ export default function App() {
     round,
     revealIndex,
     cardVisible,
-    curtainLifted,
     selectedVoteIds,
     discussionTimeLeft,
     voteTimeLeft,
@@ -93,31 +103,6 @@ export default function App() {
     round?.impostorIds.filter(
       (id) => activePlayers.some((player) => player.id === id) && !visibleEliminatedIds.includes(id),
     ) ?? [];
-
-  const curtainPanResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => phase === 'reveal' && cardVisible && !curtainLifted,
-        onMoveShouldSetPanResponder: (_, gesture) =>
-          phase === 'reveal' && cardVisible && !curtainLifted && Math.abs(gesture.dy) > 8,
-        onPanResponderMove: (_, gesture) => {
-          curtainTranslateY.setValue(Math.min(0, Math.max(-170, gesture.dy)));
-        },
-        onPanResponderRelease: (_, gesture) => {
-          if (gesture.dy < -35) {
-            dispatch({ type: 'LIFT_CURTAIN' });
-          }
-
-          Animated.spring(curtainTranslateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 70,
-            friction: 8,
-          }).start();
-        },
-      }),
-    [cardVisible, curtainLifted, curtainTranslateY, phase],
-  );
 
   useEffect(() => {
     let isMounted = true;
@@ -317,12 +302,9 @@ export default function App() {
 
   function continueReveal() {
     if (!cardVisible) {
-      curtainTranslateY.setValue(0);
       dispatch({ type: 'SHOW_CARD' });
       return;
     }
-
-    if (!curtainLifted) return;
 
     dispatch({ type: 'CONTINUE_REVEAL', maxDiscussionMinutes: settings.discussionMinutes });
   }
@@ -391,6 +373,11 @@ export default function App() {
     });
   }
 
+  function leaveOnlineRoom() {
+    leaveRoom();
+    setGameMode('selecting');
+  }
+
   function resetGame() {
     dispatch({ type: 'RESET_GAME' });
   }
@@ -401,31 +388,68 @@ export default function App() {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   }
 
-  if (showIntro) {
-    return <IntroScreen onFinish={() => setShowIntro(false)} />;
-  }
-
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <StatusBar style="light" />
-        <Text style={styles.loadingText}>Cargando...</Text>
+      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+        <Text style={[styles.loadingText, { color: colors.onBackground }]}>Cargando...</Text>
       </View>
     );
   }
 
+  if (showIntro) {
+    return <IntroScreen onFinish={() => setShowIntro(false)} />;
+  }
+
+  if (gameMode === 'selecting') {
+    return (
+      <GameModeScreen
+        onSelectPresencial={() => setGameMode('presencial')}
+        onSelectOnline={() => setGameMode('online')}
+      />
+    );
+  }
+
+  if (gameMode === 'online') {
+    if (gameStarted && myRole) {
+      return <OnlineGameScreen onLeave={leaveOnlineRoom} />;
+    }
+    if (roomCode) {
+      return <WaitingRoomScreen onBack={leaveOnlineRoom} />;
+    }
+    return <OnlineSetupScreen onBack={leaveOnlineRoom} />;
+  }
+
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'android' ? undefined : 'padding'}
     >
-      <StatusBar style="light" />
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={[styles.hero, phase === 'reveal' && styles.heroCompact]}>
-          <Text style={styles.kicker}>Juego presencial multijugador</Text>
-          <Text style={[styles.title, phase === 'reveal' && styles.titleCompact]}>El Impostor Biblico</Text>
-          {subtitle && phase !== 'reveal' ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-          {phase !== 'reveal' ? <View style={styles.heroLine} /> : null}
+        <View
+          style={[
+            styles.hero,
+            {
+              backgroundColor: colors.surfaceContainer,
+              borderColor: colors.outline,
+              shadowColor: colors.primary,
+            },
+            phase === 'reveal' && styles.heroCompact,
+          ]}
+        >
+          <Text style={[styles.kicker, { color: colors.primary }]}>Juego presencial multijugador</Text>
+          <Text
+            style={[styles.title, { color: colors.onSurface }, phase === 'reveal' && styles.titleCompact]}
+          >
+            El Impostor Biblico
+          </Text>
+          {subtitle && phase !== 'reveal' ? (
+            <Text style={[styles.subtitle, { color: colors.onSurfaceVariant }]}>{subtitle}</Text>
+          ) : null}
+          {phase !== 'reveal' ? (
+            <View style={[styles.heroLine, { backgroundColor: colors.primary }]} />
+          ) : null}
         </View>
 
         {phase === 'setup' && (
@@ -460,11 +484,8 @@ export default function App() {
             <RevealScreen
               currentPlayer={currentPlayer}
               cardVisible={cardVisible}
-              curtainLifted={curtainLifted}
               currentPlayerIsImpostor={currentPlayerIsImpostor}
               round={round}
-              curtainTranslateY={curtainTranslateY}
-              curtainPanResponder={curtainPanResponder}
               onContinueReveal={continueReveal}
             />
           </ErrorBoundary>

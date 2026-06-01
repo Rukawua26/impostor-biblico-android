@@ -2,7 +2,14 @@ import { render, screen } from '@testing-library/react-native';
 import { VoteScreen } from '../VoteScreen';
 import { RulesScreen } from '../RulesScreen';
 import { EliminatedScreen } from '../EliminatedScreen';
+import { ThemeProvider } from '../../context/ThemeContext';
 import type { GameSettings, Player } from '../../types/game';
+
+function renderWithTheme(ui: React.ReactElement) {
+  return render(ui, {
+    wrapper: ({ children }) => <ThemeProvider>{children}</ThemeProvider>,
+  });
+}
 
 const players: Player[] = [
   { id: 1, name: 'Alice' },
@@ -19,7 +26,7 @@ const settings: GameSettings = {
 
 describe('VoteScreen smoke', () => {
   it('renders title and player list', () => {
-    render(
+    renderWithTheme(
       <VoteScreen
         activePlayers={players}
         selectedVoteIds={[]}
@@ -39,7 +46,7 @@ describe('VoteScreen smoke', () => {
   });
 
   it('shows confirm disabled with no selection', () => {
-    render(
+    renderWithTheme(
       <VoteScreen
         activePlayers={players}
         selectedVoteIds={[]}
@@ -57,7 +64,7 @@ describe('VoteScreen smoke', () => {
   });
 
   it('shows confirm enabled with selection', () => {
-    render(
+    renderWithTheme(
       <VoteScreen
         activePlayers={players}
         selectedVoteIds={[1]}
@@ -77,7 +84,7 @@ describe('VoteScreen smoke', () => {
 
 describe('RulesScreen smoke', () => {
   it('renders rules and button', () => {
-    render(<RulesScreen maxRounds={20} onBeginReveal={jest.fn()} />);
+    renderWithTheme(<RulesScreen maxRounds={20} onBeginReveal={jest.fn()} />);
     expect(screen.getByText('Como se juega')).toBeOnTheScreen();
     expect(screen.getByText('Entendido')).toBeOnTheScreen();
   });
@@ -85,7 +92,7 @@ describe('RulesScreen smoke', () => {
 
 describe('EliminatedScreen smoke', () => {
   it('renders eliminated result', () => {
-    render(
+    renderWithTheme(
       <EliminatedScreen
         eliminatedPlayerName="Alice"
         isPluralEliminated={false}
@@ -103,7 +110,7 @@ describe('EliminatedScreen smoke', () => {
   });
 
   it('renders plural eliminated', () => {
-    render(
+    renderWithTheme(
       <EliminatedScreen
         eliminatedPlayerName="Alice, Bob"
         isPluralEliminated={true}

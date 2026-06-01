@@ -1,5 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Button } from './ui/Button';
 import type { GameSettings, Player } from '../types/game';
+import { useTheme } from '../context/ThemeContext';
 
 type VoteScreenProps = {
   activePlayers: Player[];
@@ -26,136 +28,89 @@ export function VoteScreen({
   onNewGame,
   onEditGame,
 }: VoteScreenProps) {
+  const { colors } = useTheme();
+
   return (
-    <View style={styles.card}>
-      <Text style={styles.sectionTitle}>Votacion fisica</Text>
-      <Text style={styles.timerText}>{formatTime(voteTimeLeft)}</Text>
-      <Text style={styles.helperText}>
+    <View style={[styles.card, { backgroundColor: colors.secondaryContainer, borderColor: colors.outline }]}>
+      <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Votacion fisica</Text>
+      <Text style={[styles.timerText, { color: colors.onSurface }]}>{formatTime(voteTimeLeft)}</Text>
+      <Text style={[styles.helperText, { color: colors.onSurfaceVariant }]}>
         Todos votan levantando la mano. El facilitador marca al jugador que el grupo decidio eliminar. Puedes
         escoger hasta {settings.impostorCount}.
       </Text>
-      <Text style={styles.selectionCountText}>
+      <Text style={[styles.selectionCountText, { color: colors.onSurfaceVariant }]}>
         Seleccionados {selectedVoteIds.length} de {settings.impostorCount} posibles
       </Text>
       {activePlayers.map((player) => (
-        <Pressable
-          key={player.id}
-          style={[styles.voteButton, selectedVoteIds.includes(player.id) && styles.voteButtonSelected]}
-          onPress={() => onToggleVoteSelection(player.id)}
-        >
-          <Text style={styles.voteButtonText}>{player.name}</Text>
-        </Pressable>
+        <View key={player.id} style={styles.voteButtonContainer}>
+          <Button
+            title={player.name}
+            onPress={() => onToggleVoteSelection(player.id)}
+            variant={selectedVoteIds.includes(player.id) ? 'secondary' : 'outline'}
+            size="medium"
+          />
+        </View>
       ))}
       {selectedPlayers.length > 0 ? (
-        <Text style={styles.warningText}>
+        <Text style={[styles.warningText, { color: colors.error }]}>
           Confirmar: {selectedPlayers.map((player) => player.name).join(', ')}
         </Text>
       ) : null}
-      <Pressable
-        style={[styles.primaryButton, selectedVoteIds.length === 0 && styles.disabledButton]}
-        disabled={selectedVoteIds.length === 0}
+      <Button
+        title={selectedVoteIds.length > 1 ? 'Confirmar eliminados' : 'Confirmar eliminado'}
         onPress={onConfirmVote}
-      >
-        <Text style={styles.primaryButtonText}>
-          {selectedVoteIds.length > 1 ? 'Confirmar eliminados' : 'Confirmar eliminado'}
-        </Text>
-      </Pressable>
-      <Pressable style={styles.secondaryButton} onPress={onNewGame}>
-        <Text style={styles.secondaryButtonText}>Nueva partida</Text>
-      </Pressable>
-      <Pressable style={styles.secondaryButton} onPress={onEditGame}>
-        <Text style={styles.secondaryButtonText}>Editar partida</Text>
-      </Pressable>
+        variant="primary"
+        disabled={selectedVoteIds.length === 0}
+      />
+      <View style={styles.buttonRow}>
+        <Button title="Nueva partida" onPress={onNewGame} variant="outline" />
+        <Button title="Editar partida" onPress={onEditGame} variant="outline" />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#B76288',
-    borderColor: '#0B78B3',
     borderRadius: 32,
     borderWidth: 1,
     marginBottom: 14,
     padding: 18,
   },
   sectionTitle: {
-    color: '#FFFFFF',
     fontSize: 23,
     fontWeight: '800',
     letterSpacing: -0.2,
     marginBottom: 14,
   },
   timerText: {
-    color: '#FFFFFF',
     fontSize: 54,
     fontWeight: '900',
     marginBottom: 12,
     textAlign: 'center',
   },
   helperText: {
-    color: '#FFFFFF',
     fontSize: 15,
     lineHeight: 21,
     marginBottom: 16,
   },
   selectionCountText: {
-    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '900',
     marginBottom: 12,
     textAlign: 'center',
   },
-  voteButton: {
-    backgroundColor: '#B76288',
-    borderColor: '#0B78B3',
-    borderRadius: 16,
-    borderWidth: 1,
+  voteButtonContainer: {
     marginBottom: 10,
-    padding: 15,
-  },
-  voteButtonSelected: {
-    backgroundColor: '#FF4406',
-    borderColor: '#0B78B3',
-  },
-  voteButtonText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '800',
   },
   warningText: {
-    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
     marginTop: 12,
   },
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: '#FF4406',
-    borderRadius: 20,
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
     marginTop: 16,
-    paddingVertical: 15,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  disabledButton: {
-    opacity: 0.45,
-  },
-  secondaryButton: {
-    alignItems: 'center',
-    backgroundColor: '#B76288',
-    borderColor: '#0B78B3',
-    borderRadius: 20,
-    borderWidth: 1,
-    marginTop: 8,
-    paddingVertical: 14,
-  },
-  secondaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
   },
 });

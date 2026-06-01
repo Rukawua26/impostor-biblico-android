@@ -15,7 +15,7 @@ module.exports = tseslint.config(
     },
   },
   {
-    files: ['jest.config.js'],
+    files: ['babel.config.js', 'jest.config.js'],
     languageOptions: {
       globals: { module: 'writable', require: 'readonly' },
     },
@@ -27,6 +27,6 @@ module.exports = tseslint.config(
     },
   },
   {
-    ignores: ['node_modules/', 'dist/', 'web-build/', '.expo/'],
+    ignores: ['node_modules/', 'dist/', 'web-build/', '.expo/', 'server/'],
   },
 );
